@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Register to Switch Controller</title>   
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+</head>
+
+<body style="background-color: #666666;">
+
+    <div class="limiter">
+        <div class="container-login100">
+            <div class="wrap-login100">
+                <form class="login100-form validate-form" action="index.php" method="POST">
+                    <span class="login100-form-title p-b-43">
+						Register to Switch Controller
+					</span></br>
+
+                    <div class="wrap-input100 validate-input" data-validate="Valid Name is required">
+                        <input class="input100" type="text" name="UseName" placeholder="UserName">
+                        <span class="focus-input100"></span>
+                    </div>
+
+				<div id="myDIV" style="display:none;">
+                    <div class="wrap-input100 validate-input" data-validate="Password is required">
+                        <input class="input100" type="password" name="pass" placeholder="Password">
+                        <span class="focus-input100"></span>
+                    </div>
+				</div>
+
+						</br></br>
+                            <input class="input-checkbox100" id="checkboxname" type="checkbox" onclick="myFunction()">
+                            <label class="label-checkbox100" for="checkboxname">
+								Register as Admin
+							</label>
+						</br></br>
+
+                    <div class="container-login100-form-btn">
+                        <button class="login100-form-btn" type="submit" name='login'> 
+							Register
+						</button>
+
+                    </div>
+
+                </form>
+
+                <div class="login100-more" style="background-image: url('images/bg-04.jpg');">
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+
+		<script>
+		function myFunction() {
+		  var x = document.getElementById("myDIV");
+		  if (x.style.display === "none") {
+			x.style.display = "block";
+		  } else {
+			x.style.display = "none";
+		  }
+		}
+		</script>
+
+</html>
