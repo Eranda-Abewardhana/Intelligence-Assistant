@@ -47,8 +47,9 @@ class ObjectDetection:
             detections = []
             for r in results.boxes.data.tolist():
                 x1, y1, x2, y2, score, class_id = r
-                x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-                detections.append([[x1, y1, x2, y2], score, class_id])
+                if(class_id == 39):
+                    x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+                    detections.append([[x1, y1, x2, y2], score, class_id])
 
             tracked = self.tracker.update_tracks(detections, frame=frame)
             
@@ -58,23 +59,24 @@ class ObjectDetection:
                 track_id = int(track.track_id)
                 color = self.colors[track_id % len(self.colors)]
                 
-                x1, y1, x2, y2 = map(int, track.to_ltrb(orig=True))
-                obj_mid = [int((x1 + x2)/2),int((y1+y2)/2)]
+                x1, y1, x2, y2 = map(int, track.to_ltwh(orig=True))
+                obj_mid = [int((x1+x2)/2),int((y1+y2)/2)]
 
                 frame_width_mid = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
                 frame_height_mid = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
 
-                # print("Change X : ", obj_mid[0] - frame_width_mid, " | Change Y : ", obj_mid[1] - frame_height_mid)
+                errorX = (obj_mid[0] - frame_width_mid)
+                errorY = (frame_height_mid - obj_mid[1])
+                print("error X"+ str(errorX) )
+                
+                print("Change X : ", errorX, " | Change Y : ", errorY)
                 cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
                 cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
-                cv2.putText(frame,f'X:{obj_mid[0] - frame_width_mid} | Y:{obj_mid[1] - frame_height_mid}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+                cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
 
-                errorX = obj_mid[0] - frame_width_mid
-                errorY = obj_mid[1] - frame_height_mid
-
-                cv2.rectangle(frame, (x1, y1), (x2-x1, y2-y1), (color), 3)
-                cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,255),-1)
-                cv2.putText(frame,f'ID : {track_id}',(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+                # cv2.rectangle(frame, (x1, y1), (x2, y2), (color), 3)
+                cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
+                # cv2.putText(frame,f'ID : {track_id}',(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
 
             end_time = time()
             fps = round(1/(end_time - start_time), 2)
