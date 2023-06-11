@@ -3,11 +3,28 @@ import cv2
 from ultralytics import YOLO
 import random
 from time import time
+import serial
 from deep_sort_realtime.deepsort_tracker import DeepSort
+import urllib.request#defines function and_ classes which help in opening urls
 
 
 class ObjectDetection:
-    def __init__(self, videoCapture=1, windowResolution=480):
+    errorX = 0
+
+      # PID constants
+    kp = 0.1  # Proportional gain
+    ki = 0.05  # Integral gain
+    kd = 0.01  # Derivative gain
+
+    last_time = 0  # Last time update occurred
+    error_sum = 0.0  # Cumulative error
+    last_error = 0.0  # Last error
+    last_time = 0  # Last time update occurred
+
+            #url handling module for python
+    root_url = "http://192.168.137.160/m:"
+
+    def __init__(self, videoCapture=0, windowResolution=480):
         self.capture_index = videoCapture
         self.device = 'cuda' if cuda.is_available() else 'cpu'
         print("Using Device: ", self.device)
@@ -37,8 +54,13 @@ class ObjectDetection:
     def exit(self):
         self.cap.release()
         cv2.destroyAllWindows()
-  
+
+    def sendRequest(self,url):
+	    n = urllib.request.urlopen(url) # send request to ESP
+
     def __call__(self):
+
+          
         while True:
             start_time = time()
             rect, frame = self.cap.read()
@@ -78,6 +100,22 @@ class ObjectDetection:
                 cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
                 # cv2.putText(frame,f'ID : {track_id}',(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
 
+                self.current_time = time()
+                self.elapsed_time = self.current_time - self.last_time
+
+                    # PID calculations
+                self.error_sum += self.errorX * self.elapsed_time
+                self.d_error = (errorX - self.last_error) / self.elapsed_time
+
+                    # PID output
+                output = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
+                url = self.root_url + str(output)
+                self.sendRequest(url)
+
+                # time.sleep(0.1)  # Delay for a short period
+                last_error = errorX
+                last_time = current_time
+
             end_time = time()
             fps = round(1/(end_time - start_time), 2)
             print(f'FPS: {fps}')
@@ -87,5 +125,5 @@ class ObjectDetection:
 
         exit()
     
-detector = ObjectDetection(videoCapture = 1, windowResolution = 480)
+detector = ObjectDetection(videoCapture = 0, windowResolution = 480)
 detector()
