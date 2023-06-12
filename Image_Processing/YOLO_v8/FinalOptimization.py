@@ -6,6 +6,7 @@ from time import time
 import serial
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import urllib.request#defines function and_ classes which help in opening urls
+import requests
 
 
 class ObjectDetection:
@@ -22,9 +23,9 @@ class ObjectDetection:
     last_time = 0  # Last time update occurred
 
             #url handling module for python
-    root_url = "http://192.168.137.160/m:"
+    root_url = "http://192.168.1.5"
 
-    def __init__(self, videoCapture=0, windowResolution=480):
+    def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
         self.device = 'cuda' if cuda.is_available() else 'cpu'
         print("Using Device: ", self.device)
@@ -56,7 +57,15 @@ class ObjectDetection:
         cv2.destroyAllWindows()
 
     def sendRequest(self,url):
-	    n = urllib.request.urlopen(url) # send request to ESP
+        # try :
+	    #     n = urllib.request.urlopen(url) # send request to ESP
+        # except urllib.error.URLError as e:
+        #     print("An error occurred:", e)         
+        try:
+            response = requests.get(url)
+            # Process the response here
+        except requests.exceptions.RequestException as e:
+            print("An error occurred:", e)
 
     def __call__(self):
 
@@ -64,6 +73,7 @@ class ObjectDetection:
         while True:
             start_time = time()
             rect, frame = self.cap.read()
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             results = self.predict(frame)
 
             detections = []
@@ -89,8 +99,7 @@ class ObjectDetection:
 
                 errorX = (obj_mid[0] - frame_width_mid)
                 errorY = (frame_height_mid - obj_mid[1])
-                print("error X"+ str(errorX) )
-                
+                                
                 print("Change X : ", errorX, " | Change Y : ", errorY)
                 cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
                 cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
@@ -109,12 +118,13 @@ class ObjectDetection:
 
                     # PID output
                 output = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
-                url = self.root_url + str(output)
+                url = self.root_url + "/m:" + str(output)
+                print(url)
                 self.sendRequest(url)
 
                 # time.sleep(0.1)  # Delay for a short period
                 last_error = errorX
-                last_time = current_time
+                self.last_time = self.current_time
 
             end_time = time()
             fps = round(1/(end_time - start_time), 2)
@@ -125,5 +135,5 @@ class ObjectDetection:
 
         exit()
     
-detector = ObjectDetection(videoCapture = 0, windowResolution = 480)
+detector = ObjectDetection(videoCapture = 1, windowResolution = 480)
 detector()

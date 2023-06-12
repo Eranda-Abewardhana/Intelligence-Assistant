@@ -45,7 +45,9 @@ void loop() {
       char c = (char)SerialRoom.read();
       voice += c;
   }
+  
   if (voice.length() > 0) {
+      delay(50);
       int get = voice.indexOf(":");
       String data1 = voice.substring(0,get);
       String data2 = voice.substring(get+1, voice.length());
@@ -81,7 +83,7 @@ void updateEncoder() {
 
 
 void function(String x,long error){
-  if(x == "err"){
+  if(x == "m"){
     // digitalWrite(trig,LOW);
     // delayMicroseconds(2);
     // digitalWrite(trig,HIGH);
