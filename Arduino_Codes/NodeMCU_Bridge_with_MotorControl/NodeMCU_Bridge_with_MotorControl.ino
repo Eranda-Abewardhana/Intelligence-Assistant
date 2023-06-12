@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
-const char *ssid = "SLT_FIBRE";
-const char *password = "19765320";
+const char *ssid = "Xiaomi";
+const char *password = "CHANNA2001";
 
 const int led = 4;
 WiFiServer server(80);
@@ -36,62 +36,68 @@ void loop()
   WiFiClient client;
   client = server.available();
 
-  if (client == 1){
+  if (client){
 
-        // String request = client.readStringUntil('\r');
-        // Serial.println(request);
-        // client.flush();
-       
-        // Close the client connection
-        // client.stop();
-        // Extract parameters from the request
-        // String parameter1 = extractParameter(request, "m_init");
-        // String parameter2 = extractParameter(request, "err");
+    String request = client.readStringUntil('\n');
+    if (request.startsWith("GET")) {
+      int paramStart = request.indexOf("?") + 1;
+      int paramEnd = request.indexOf(" ", paramStart);
+      String params = request.substring(paramStart, paramEnd);
+      
+      String errValueX = getValue(params, "x_err");
+      String errValueY = getValue(params, "y_err");
+      String mInitValue = getValue(params, "m_init");
 
-        // // Print the extracted parameters
-        // NodeMCU.print("m_init : ");
-        // NodeMCU.println(parameter1);
-        // NodeMCU.print("err:");
-        // NodeMCU.println(parameter2);
-        // Serial.println(parameter1);
-        // Serial.println(parameter2);
+      Serial.print("err X = ");
+      Serial.println(errValueX);
+      Serial.print("err Y = ");
+      Serial.println(errValueY);
+      Serial.print("m_init = ");
+      Serial.println(mInitValue);
 
-        String request = client.readStringUntil('\n');
-        client.flush();
-        int spaceIndex = request.indexOf(" HTTP");
-        String method = request.substring(5, spaceIndex);
-        Serial.println(method);
-        NodeMCU.println(method);
+      String parameterList = "x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",m_init:" + String(mInitValue)+ ",##:0";
+      NodeMCU.println(parameterList);
 
-         // Handle the request and send the response
-        handleRequest(client);
-
-        // Wait a short moment before closing the connection
-        delay(10);
+      // sendResponse(client, "200OK");
+    }
+    delay(10);
   }
-}
-void handleRequest(WiFiClient client) {
-  int responseCode = 200; // Set the desired response code (e.g., 200 for OK)
 
-  // Send the response headers
-  client.print("HTTP/1.1 ");
-  client.print(responseCode);
-  client.println(" OK");
+  if (NodeMCU.available()) {
+    String receivedString = NodeMCU.readStringUntil('\n');
+
+    int colonIndex = receivedString.indexOf(':');
+    if (colonIndex != -1) {
+      String paramName = receivedString.substring(0, colonIndex);
+      String paramValue = receivedString.substring(colonIndex + 1);
+
+      int intValue = paramValue.toInt();
+
+      String content = (paramName + ":" + intValue);
+
+      sendResponse(client, content);
+    }
+  }
+
+}
+
+void sendResponse(WiFiClient client, String content) {
+  client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/plain");
   client.println();
-
-  // Send the response body
-  client.println("Response message");
+  client.println(content);
 }
-String extractParameter(String request, String paramName) {
-  int paramStart = request.indexOf(paramName + "=");
-  if (paramStart != -1) {
-    paramStart += paramName.length() + 1;
-    int paramEnd = request.indexOf('&', paramStart);
-    if (paramEnd == -1) {
-      paramEnd = request.length();
+
+String getValue(String data, String key) {
+  String separator = "=";
+  int keyStart = data.indexOf(key + separator);
+  if (keyStart != -1) {
+    keyStart += key.length() + separator.length();
+    int keyEnd = data.indexOf("&", keyStart);
+    if (keyEnd == -1) {
+      keyEnd = data.length();
     }
-    return request.substring(paramStart, paramEnd);
+    return data.substring(keyStart, keyEnd);
   }
   return "";
 }
