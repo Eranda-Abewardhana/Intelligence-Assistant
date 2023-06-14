@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
-const char *ssid = "Xiaomi";
-const char *password = "CHANNA2001";
+const char *ssid = "test";
+const char *password = "19765320";
 
 const int led = 4;
 WiFiServer server(80);
@@ -47,6 +47,7 @@ void loop()
       String errValueX = getValue(params, "x_err");
       String errValueY = getValue(params, "y_err");
       String mInitValue = getValue(params, "m_init");
+      String stopVal = getValue(params, "stop");
 
       Serial.print("err X = ");
       Serial.println(errValueX);
@@ -54,8 +55,10 @@ void loop()
       Serial.println(errValueY);
       Serial.print("m_init = ");
       Serial.println(mInitValue);
+      Serial.print("stop = ");
+      Serial.println(stopVal);
 
-      String parameterList = "x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",m_init:" + String(mInitValue)+ ",##:0";
+      String parameterList = "stop:" + String(stopVal) + ",m_init:" + String(mInitValue) + ",x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",##:0";
       NodeMCU.println(parameterList);
 
       // sendResponse(client, "200OK");
@@ -65,20 +68,9 @@ void loop()
 
   if (NodeMCU.available()) {
     String receivedString = NodeMCU.readStringUntil('\n');
-
-    int colonIndex = receivedString.indexOf(':');
-    if (colonIndex != -1) {
-      String paramName = receivedString.substring(0, colonIndex);
-      String paramValue = receivedString.substring(colonIndex + 1);
-
-      int intValue = paramValue.toInt();
-
-      String content = (paramName + ":" + intValue);
-
-      sendResponse(client, content);
-    }
+    Serial.println(receivedString);
+    sendResponse(client, receivedString);
   }
-
 }
 
 void sendResponse(WiFiClient client, String content) {

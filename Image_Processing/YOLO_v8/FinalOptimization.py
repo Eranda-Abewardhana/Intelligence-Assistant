@@ -3,16 +3,12 @@ import cv2
 from ultralytics import YOLO
 import random
 from time import time
-import serial
 from deep_sort_realtime.deepsort_tracker import DeepSort
-import urllib.request#defines function and_ classes which help in opening urls
 import requests
 
 
 class ObjectDetection:
     errorX = 0
-
-      # PID constants
     kp = 0.1  # Proportional gain
     ki = 0.05  # Integral gain
     kd = 0.01  # Derivative gain
@@ -22,8 +18,7 @@ class ObjectDetection:
     last_error = 0.0  # Last error
     last_time = 0  # Last time update occurred
 
-            #url handling module for python
-    root_url = "http://192.168.1.5"
+    root_url = "http://192.168.234.76"
 
     def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
@@ -56,20 +51,19 @@ class ObjectDetection:
         self.cap.release()
         cv2.destroyAllWindows()
 
-    def sendRequest(self,url):
-        # try :
-	    #     n = urllib.request.urlopen(url) # send request to ESP
-        # except urllib.error.URLError as e:
-        #     print("An error occurred:", e)         
+    def sendRequest(self, stop=1, x_err=0, y_err=0, m_init=0):    
         try:
+            url = f"{self.root_url}/?stop={stop}&x_err={x_err}&y_err={y_err}&m_init={m_init}"
             response = requests.get(url)
-            # Process the response here
+            if response.status_code == 200:
+                print("Response content:")
+                print(response.text)
+            else:
+                print("Request failed with status code:", response.status_code)
         except requests.exceptions.RequestException as e:
             print("An error occurred:", e)
 
     def __call__(self):
-
-          
         while True:
             start_time = time()
             rect, frame = self.cap.read()
@@ -112,18 +106,14 @@ class ObjectDetection:
                 self.current_time = time()
                 self.elapsed_time = self.current_time - self.last_time
 
-                    # PID calculations
                 self.error_sum += self.errorX * self.elapsed_time
                 self.d_error = (errorX - self.last_error) / self.elapsed_time
 
-                    # PID output
-                output = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
-                url = self.root_url + "/m:" + str(output)
-                print(url)
-                self.sendRequest(url)
+                finalErr = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
+                self.sendRequest(stop = 0, x_err = finalErr)
 
                 # time.sleep(0.1)  # Delay for a short period
-                last_error = errorX
+                self.last_error = self.errorX
                 self.last_time = self.current_time
 
             end_time = time()
@@ -131,7 +121,9 @@ class ObjectDetection:
             print(f'FPS: {fps}')
 
             cv2.imshow("RGB", frame)
-            if(cv2.waitKey(30) == 27): break
+            if(cv2.waitKey(1) == 27): 
+                self.sendRequest(stop = 1)
+                break
 
         exit()
     

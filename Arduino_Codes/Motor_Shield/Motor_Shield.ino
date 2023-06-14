@@ -1,40 +1,33 @@
 #include <SoftwareSerial.h>
-#include <Wire.h>
-#include <Adafruit_MotorShield.h>
-#include "utility/Adafruit_MS_PWMServoDriver.h"
 
 SoftwareSerial NodeMCU(2,3);
-Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
 
-Adafruit_DCMotor *myMotor1 = AFMS.getMotor(3);
-Adafruit_DCMotor *myMotor2 = AFMS.getMotor(4);
+int enA = A0;
+int in1 = A2; // L F
+int in2 = A3; // L B
 
+int enB = A1;
+int in3 = A4; // R F
+int in4 = A5; // R B
 
-int encoderPin1 = 10; //Encoder Output 'A' must connected with intreput pin of arduino.
-int encoderPin2 = 11; //Encoder Otput 'B' must connected with intreput pin of arduino.
-volatile int lastEncoded = 0; // Here updated value of encoder store.
-volatile long encoderValue = 0; // Raw encoder value
+String response = "";
+
 int trig = 2;
 int echo = 4;
-int initSpeed = 0; // Desired motor speed
-int measuredSpeed = 0;
-String voice="";
-String voiceHistory="";
-long error = 0;
+int initSpeed = 0;
+
+int stopVal = 0;
 
 void setup() {
-	AFMS.begin();
   Serial.begin(9600);
   NodeMCU.begin(9600);
 
-  pinMode(encoderPin1, INPUT_PULLUP); 
-  pinMode(encoderPin2, INPUT_PULLUP);
-
-  digitalWrite(encoderPin1, HIGH); //turn pullup resistor on
-  digitalWrite(encoderPin2, HIGH); //turn pullup resistor on
-
-  attachInterrupt(0, updateEncoder, CHANGE); 
-  attachInterrupt(1, updateEncoder, CHANGE);
+  pinMode(enA, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(enB, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
 }
 
 void loop() {
@@ -54,34 +47,23 @@ void loop() {
       Serial.print(paramName + " : ");
       Serial.println(intValue);
 
-      if(paramName == "x_err"){
-        X_errFunction(intValue);
+      if(paramName == "stop"){
+        stopVal = intValue;
       }
-
-      if(paramName == "m_init"){
+      else if(paramName == "m_init"){
         initSpeed = intValue;
       }
+      else if(paramName == "x_err"){
+        X_errFunction(intValue);
+      }
+      else if(paramName == "y_err"){
+        ;
+      }
+
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
   }
 }
-
-void updateEncoder() {
-  int MSB = digitalRead(encoderPin1);
-  int LSB = digitalRead(encoderPin2);
-  int encoded = (MSB << 1) | LSB;
-  int sum = (lastEncoded << 2) | encoded;
-
-  if (sum == 0b1101 || sum == 0b0100 || sum == 0b0010 || sum == 0b1011)
-    encoderValue--;
-  if (sum == 0b1110 || sum == 0b0111 || sum == 0b0001 || sum == 0b1000)
-    encoderValue++;
-
-  lastEncoded = encoded;
-
-  measuredSpeed = (encoderValue * 60.0) / 64.0;
-}
-
 
 void X_errFunction(int error){
     // digitalWrite(trig,LOW);
@@ -96,60 +78,52 @@ void X_errFunction(int error){
     // if(cm > 30) {        
     // Apply output to motors
 
-      int newError = constrain(error, -1000, 1000);
-      int motorVal = map(newError, -1000, 1000, -250, 250);
+      if (stopVal==1){
+        analogWrite(enA, 0);
+        analogWrite(enB, 0);
+        response += "Stopped !";
+      } else {
+        int newError = constrain(error, -1000, 1000);
+        int motorVal = map(newError, -1000, 1000, -250, 250);
 
-      if(motorVal<0){
-        motorControl('l', motorVal);
-        motorControl('r', -motorVal);
-      }else{
-        motorControl('l', motorVal);
-        motorControl('r', -motorVal);
+        if( abs(motorVal) >= initSpeed ){
+          if( motorVal >= 0 ){
+            motorControl('R', 'B', motorVal-initSpeed);
+            motorControl('L', 'F', motorVal+initSpeed);
+          }else{
+            motorControl('L', 'B', -motorVal-initSpeed);
+            motorControl('R', 'F', -motorVal+initSpeed);
+          }
+        }else{
+          motorControl('R', 'F', -motorVal+initSpeed);
+          motorControl('L', 'F', motorVal+initSpeed);
+        }
+        
       }
-
+      NodeMCU.println(response);
+      Serial.println(response);
+      response = "";
       // Serial.println("Distance in inch : "+inches);
       // Serial.println("Distance in cm : "+cm);
     // }
     
 }
 
-void motorControl(char motor, int speed){
-  int finalSpeed = speed + initSpeed;
-  if(finalSpeed>0){
-    int motorSpeed = constrain(finalSpeed, 0, 255);
-    if(motor == 'l'){
-      myMotor2->setSpeed(motorSpeed);
-      myMotor2->run(FORWARD);
-      Serial.print("  Motor Left F : ");
-      Serial.println(motorSpeed);
-      sendResponse("MLF",motorSpeed);
-    }else if(motor == 'r'){
-      myMotor1->setSpeed(motorSpeed);
-      myMotor1->run(FORWARD);
-      Serial.print("  Motor Right F : ");
-      Serial.println(motorSpeed);
-      sendResponse("MRF",motorSpeed);
-    }
-  }else{
-    finalSpeed = -finalSpeed;
-    int motorSpeed = constrain(finalSpeed, 0, 255);
-    if(motor == 'l'){
-      myMotor2->setSpeed(motorSpeed);
-      myMotor2->run(BACKWARD);
-      Serial.print("  Motor Left B : ");
-      Serial.println(motorSpeed);
-      sendResponse("MLB",motorSpeed);
-    }else if(motor == 'r'){
-      myMotor1->setSpeed(motorSpeed);
-      myMotor1->run(BACKWARD);
-      Serial.print("  Motor Right B : ");
-      Serial.println(motorSpeed);
-      sendResponse("MRB",motorSpeed);
-    }
+void motorControl(char pos, char dir, int speed){
+  speed = constrain(speed, 0, 255);
+  response += "  | " + String(pos) + " " + String(dir) + " : " + String(speed);
+  if( pos == 'R' ){
+    analogWrite(enB, speed);
+    if( dir == 'F' )
+      digitalWrite(in3, HIGH);
+    else if( dir == 'B' )
+      digitalWrite(in4, HIGH);
   }
-}
-
-void sendResponse(String data, int val) {
-  NodeMCU.print(data + ":");
-  NodeMCU.println(val);
+  else if( pos == 'L' ){
+    analogWrite(enA, speed);
+    if( dir == 'F' )
+      digitalWrite(in1, HIGH);
+    else if( dir == 'B' )
+      digitalWrite(in2, HIGH);
+  }
 }
