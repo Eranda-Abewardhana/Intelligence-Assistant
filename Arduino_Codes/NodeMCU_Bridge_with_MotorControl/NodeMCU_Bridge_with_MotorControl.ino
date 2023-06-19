@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
-const char *ssid = "test";
-const char *password = "19765320";
+const char *ssid = "TS iPhone";
+const char *password = "tshotspot5";
 
 const int led = 4;
 WiFiServer server(80);
@@ -11,7 +11,7 @@ SoftwareSerial NodeMCU(D2,D3);
 void setup()
 {
   pinMode(led, OUTPUT);
-  Serial.begin(115200);	
+  Serial.begin(9600);	
 	NodeMCU.begin(9600);
 	pinMode(D2,INPUT);
 	pinMode(D3,OUTPUT);
@@ -48,17 +48,21 @@ void loop()
       String errValueY = getValue(params, "y_err");
       String mInitValue = getValue(params, "m_init");
       String stopVal = getValue(params, "stop");
+      String servoBase = getValue(params, "servo_base");
+      String servoGrip = getValue(params, "servo_grip");
+      String servo1 = getValue(params, "servo_1");
+      String servo2 = getValue(params, "servo_2");
 
-      Serial.print("err X = ");
-      Serial.println(errValueX);
-      Serial.print("err Y = ");
-      Serial.println(errValueY);
-      Serial.print("m_init = ");
-      Serial.println(mInitValue);
-      Serial.print("stop = ");
-      Serial.println(stopVal);
+      Serial.print("err X = " + String(errValueX));
+      Serial.print("err Y = " + String(errValueY));
+      Serial.print("m_init = " + String(mInitValue));
+      Serial.print("stop = " + String(stopVal));
+      Serial.print("Servo Base = " + String(servoBase));
+      Serial.print("Gripper = " + String(servoGrip));
+      Serial.print("Servo 1 = " + String(servo1));
+      Serial.print("Servo 2 = " + String(servo2));
 
-      String parameterList = "stop:" + String(stopVal) + ",m_init:" + String(mInitValue) + ",x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",##:0";
+      String parameterList = "stop:" + String(stopVal) + ",m_init:" + String(mInitValue) + ",x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",servo_base:" + String(servoBase) + ",servo_grip:" + String(servoGrip) + ",servo_1:" + String(servo1) + ",servo_2:" + String(servo2) + ",##:0";
       NodeMCU.println(parameterList);
 
       // sendResponse(client, "200OK");

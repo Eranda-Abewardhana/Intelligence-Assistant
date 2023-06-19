@@ -51,10 +51,19 @@ class ObjectDetection:
         self.cap.release()
         cv2.destroyAllWindows()
 
-    def sendRequest(self, stop=1, x_err=0, y_err=0, m_init=0):    
+    def sendRequest(self, stop=1, x_err=0, y_err=0, m_init=0):
         try:
-            url = f"{self.root_url}/?stop={stop}&x_err={x_err}&y_err={y_err}&m_init={m_init}"
-            response = requests.get(url)
+            payload = {
+                'stop': stop,
+                'x_err': x_err,
+                'y_err': y_err,
+                'm_init': m_init,
+                'servo_base': 0,
+                'servo_grip': 0,
+                'servo_1': 0,
+                'servo_2': 0,
+            }
+            response = requests.get(self.root_url, params=payload, verify=False, timeout=1)
             if response.status_code == 200:
                 print("Response content:")
                 print(response.text)
@@ -67,7 +76,7 @@ class ObjectDetection:
         while True:
             start_time = time()
             rect, frame = self.cap.read()
-            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            # frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             results = self.predict(frame)
 
             detections = []
@@ -110,9 +119,9 @@ class ObjectDetection:
                 self.d_error = (errorX - self.last_error) / self.elapsed_time
 
                 finalErr = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
-                self.sendRequest(stop = 0, x_err = finalErr)
+                self.sendRequest(stop = 0, x_err = int(finalErr))
 
-                # time.sleep(0.1)  # Delay for a short period
+                time.sleep(0.1)
                 self.last_error = self.errorX
                 self.last_time = self.current_time
 
@@ -121,10 +130,10 @@ class ObjectDetection:
             print(f'FPS: {fps}')
 
             cv2.imshow("RGB", frame)
-            if(cv2.waitKey(1) == 27): 
+            if(cv2.waitKey(30) == 27): 
                 self.sendRequest(stop = 1)
                 break
-
+ 
         exit()
     
 detector = ObjectDetection(videoCapture = 1, windowResolution = 480)

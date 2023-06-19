@@ -1,19 +1,25 @@
 #include <SoftwareSerial.h>
+#include <Servo.h>
 
 SoftwareSerial NodeMCU(2,3);
 
-int enA = A0;
+Servo servo_base;
+Servo servo_1;
+Servo servo_2;
+Servo servo_grip;
+
+int enA = 10;
 int in1 = A2; // L F
 int in2 = A3; // L B
 
-int enB = A1;
+int enB = 11;
 int in3 = A4; // R F
 int in4 = A5; // R B
 
 String response = "";
 
-int trig = 2;
-int echo = 4;
+int trig = 8;
+int echo = 9;
 int initSpeed = 0;
 
 int stopVal = 0;
@@ -28,9 +34,20 @@ void setup() {
   pinMode(enB, OUTPUT);
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
+
+  // servo_base.attach(4);
+  // servo_grip.attach(5);
+  // servo_1.attach(6);
+  // servo_2.attach(7);
+
+  // servo_base.write(110);
+  // servo_grip.write(0);
+  // servo_1.write(80);
+  // servo_2.write(50);
 }
 
 void loop() {
+
   if (NodeMCU.available()) {
     String receivedString = NodeMCU.readStringUntil('\n');
     
@@ -59,10 +76,27 @@ void loop() {
       else if(paramName == "y_err"){
         ;
       }
+      // else if(paramName == "servo_base" && paramValue != "" ){
+      //   response += "servo_base : " + String(intValue) + ", ";
+      //   servo_base.write(intValue);
+      // }
+      // else if(paramName == "servo_grip" && paramValue != "" ){
+      //   response += "servo_grip : " + String(intValue) + ", ";
+      //   servo_grip.write(intValue);
+      // }
+      // else if(paramName == "servo_1" && paramValue != "" ){
+      //   response += "servo_1 : " + String(intValue) + ", ";
+      //   servo_1.write(intValue);
+      // }
+      // else if(paramName == "servo_2" && paramValue != "" ){
+      //   response += "servo_2 : " + String(intValue) + ", ";
+      //   servo_2.write(intValue);
+      // }
 
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
   }
+
 }
 
 void X_errFunction(int error){
@@ -113,14 +147,18 @@ void motorControl(char pos, char dir, int speed){
   speed = constrain(speed, 0, 255);
   response += "  | " + String(pos) + " " + String(dir) + " : " + String(speed);
   if( pos == 'R' ){
-    analogWrite(enB, speed);
+    analogWrite(11, speed);
+    digitalWrite(in3, LOW);
+    digitalWrite(in4, LOW);
     if( dir == 'F' )
       digitalWrite(in3, HIGH);
     else if( dir == 'B' )
       digitalWrite(in4, HIGH);
   }
   else if( pos == 'L' ){
-    analogWrite(enA, speed);
+    analogWrite(10, speed);
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
     if( dir == 'F' )
       digitalWrite(in1, HIGH);
     else if( dir == 'B' )
