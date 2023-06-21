@@ -34,10 +34,11 @@ void setup() {
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
 
-  servoPos_Base = 110;
-  servoPos_grip = 0;
-  servoPos_1 = 80;
-  servoPos_2 = 50;
+  servoPos_Base = 100;
+  servoPos_1 = 78;
+  servoPos_2 = 26;
+  servoPos_grip = 55;
+  
 }
 
 void loop() {
@@ -85,18 +86,21 @@ void loop() {
 
         servo_base.attach(4);
 
-        if(servoPos_Base < intValue){
-          for (int pos = servoPos_Base; pos <= intValue; pos += 1) {
-            servo_base.write(pos);
+        if(intValue >= 0){
+          while(intValue >= 0){
+            servoPos_Base += 1;
+            intValue -= 1;
+            servo_base.write(servoPos_Base);
             delay(15);
           }
         }else{
-          for (int pos = servoPos_Base; pos >= intValue; pos -= 1) {
-            servo_base.write(pos);
+          while(intValue < 0){
+            servoPos_Base -= 1;
+            intValue += 1;
+            servo_base.write(servoPos_Base);
             delay(15);
           }
         }
-        servoPos_Base = intValue;
 
         // servo_base.write(100);
         // servo_grip.write(0);
@@ -128,18 +132,21 @@ void loop() {
         
         servo_1.attach(6);
 
-        if(servoPos_1 < intValue){
-          for (int pos = servoPos_1; pos <= intValue; pos += 1) {
-            servo_1.write(pos);
+        if(intValue >= 0){
+          while(intValue >= 0){
+            servoPos_1 += 1;
+            intValue -= 1;
+            servo_1.write(servoPos_1);
             delay(25);
           }
         }else{
-          for (int pos = servoPos_1; pos >= intValue; pos -= 1) {
-            servo_1.write(pos);
+          while(intValue < 0){
+            servoPos_1 -= 1;
+            intValue += 1;
+            servo_1.write(servoPos_1);
             delay(25);
           }
         }
-        servoPos_1 = intValue;
 
       }
       else if(paramName == "servo_2" && paramValue != "" && servoRelax!=1){
@@ -147,19 +154,22 @@ void loop() {
         
         servo_2.attach(7);
 
-        if(servoPos_2 < intValue){
-          for (int pos = servoPos_2; pos <= intValue; pos += 1) {
-            servo_2.write(pos);
+        if(intValue >= 0){
+          while(intValue >= 0){
+            servoPos_2 += 1;
+            intValue -= 1;
+            servo_2.write(servoPos_2);
             delay(25);
           }
         }else{
-          for (int pos = servoPos_2; pos >= intValue; pos -= 1) {
-            servo_2.write(pos);
+          while(intValue < 0){
+            servoPos_2 -= 1;
+            intValue += 1;
+            servo_2.write(servoPos_2);
             delay(25);
           }
         }
-        servoPos_2 = intValue;
-
+        
       }
 
       receivedString = receivedString.substring(delimiterIndex + 1);
