@@ -1,8 +1,8 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
-const char *ssid = "TS iPhone";
-const char *password = "tshotspot5";
+const char *ssid = "DESKTOP_TS_";
+const char *password = "tshotspot1";
 
 const int led = 4;
 WiFiServer server(80);
@@ -15,7 +15,8 @@ void setup()
 	NodeMCU.begin(9600);
 	pinMode(D2,INPUT);
 	pinMode(D3,OUTPUT);
-  Serial.print("Connecting to.");
+
+  Serial.print("\nConnecting to.");
   Serial.println(ssid);
 
   WiFi.mode(WIFI_STA);
@@ -25,7 +26,7 @@ void setup()
     delay(500);
     Serial.print("..");
   }
-  Serial.println("Nodemcu(esp8266) is connected to the ssid");
+  Serial.println("\nNodemcu(esp8266) is connected to the ssid");
   Serial.println(WiFi.localIP());
   server.begin();
   delay(1000);
@@ -44,26 +45,19 @@ void loop()
       int paramEnd = request.indexOf(" ", paramStart);
       String params = request.substring(paramStart, paramEnd);
       
-      String errValueX = getValue(params, "x_err");
-      String errValueY = getValue(params, "y_err");
+      String errValueX = getValue(params, "mx_err");
+      String errValueY = getValue(params, "my_err");
       String mInitValue = getValue(params, "m_init");
-      String stopVal = getValue(params, "stop");
+      String stopVal = getValue(params, "m_stop");
       String servoBase = getValue(params, "servo_base");
       String servoGrip = getValue(params, "servo_grip");
       String servo1 = getValue(params, "servo_1");
       String servo2 = getValue(params, "servo_2");
+      String servoRelax = getValue(params, "servo_relax");
 
-      Serial.print("err X = " + String(errValueX));
-      Serial.print("err Y = " + String(errValueY));
-      Serial.print("m_init = " + String(mInitValue));
-      Serial.print("stop = " + String(stopVal));
-      Serial.print("Servo Base = " + String(servoBase));
-      Serial.print("Gripper = " + String(servoGrip));
-      Serial.print("Servo 1 = " + String(servo1));
-      Serial.print("Servo 2 = " + String(servo2));
-
-      String parameterList = "stop:" + String(stopVal) + ",m_init:" + String(mInitValue) + ",x_err:" + String(errValueX) + ",y_err:" + String(errValueY) + ",servo_base:" + String(servoBase) + ",servo_grip:" + String(servoGrip) + ",servo_1:" + String(servo1) + ",servo_2:" + String(servo2) + ",##:0";
+      String parameterList = "m_stop:" + String(stopVal) + ",m_init:" + String(mInitValue) + ",mx_err:" + String(errValueX) + ",my_err:" + String(errValueY) + ",servo_relax:" + String(servoRelax) + ",servo_base:" + String(servoBase) + ",servo_grip:" + String(servoGrip) + ",servo_1:" + String(servo1) + ",servo_2:" + String(servo2) + ",##:0";
       NodeMCU.println(parameterList);
+      Serial.println(parameterList);
 
       // sendResponse(client, "200OK");
     }

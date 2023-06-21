@@ -1,12 +1,10 @@
-#include <SoftwareSerial.h>
+// #include <SoftwareSerial.h>
 #include <Servo.h>
 
-SoftwareSerial NodeMCU(2,3);
+// SoftwareSerial NodeMCU(2,3);
 
-Servo servo_base;
-Servo servo_1;
-Servo servo_2;
-Servo servo_grip;
+Servo servo_base, servo_1, servo_2, servo_grip;
+int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
 
 int enA = 10;
 int in1 = A2; // L F
@@ -23,10 +21,11 @@ int echo = 9;
 int initSpeed = 0;
 
 int stopVal = 0;
+int servoRelax = 0;
 
 void setup() {
   Serial.begin(9600);
-  NodeMCU.begin(9600);
+  // NodeMCU.begin(9600);
 
   pinMode(enA, OUTPUT);
   pinMode(in1, OUTPUT);
@@ -35,21 +34,16 @@ void setup() {
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
 
-  // servo_base.attach(4);
-  // servo_grip.attach(5);
-  // servo_1.attach(6);
-  // servo_2.attach(7);
-
-  // servo_base.write(110);
-  // servo_grip.write(0);
-  // servo_1.write(80);
-  // servo_2.write(50);
+  servoPos_Base = 110;
+  servoPos_grip = 0;
+  servoPos_1 = 80;
+  servoPos_2 = 50;
 }
 
 void loop() {
 
-  if (NodeMCU.available()) {
-    String receivedString = NodeMCU.readStringUntil('\n');
+  if (Serial.available()) {
+    String receivedString = Serial.readStringUntil('\n');
     
     int delimiterIndex;
     while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
@@ -61,37 +55,112 @@ void loop() {
       
       int intValue = paramValue.toInt();
 
-      Serial.print(paramName + " : ");
-      Serial.println(intValue);
+      // Serial.print(paramName + " : ");
+      // Serial.println(intValue);
 
-      if(paramName == "stop"){
+      if(paramName == "m_stop"){
         stopVal = intValue;
       }
       else if(paramName == "m_init"){
         initSpeed = intValue;
       }
-      else if(paramName == "x_err"){
+      else if(paramName == "mx_err"){
         X_errFunction(intValue);
       }
-      else if(paramName == "y_err"){
+      else if(paramName == "my_err"){
         ;
       }
-      // else if(paramName == "servo_base" && paramValue != "" ){
-      //   response += "servo_base : " + String(intValue) + ", ";
-      //   servo_base.write(intValue);
-      // }
-      // else if(paramName == "servo_grip" && paramValue != "" ){
-      //   response += "servo_grip : " + String(intValue) + ", ";
-      //   servo_grip.write(intValue);
-      // }
-      // else if(paramName == "servo_1" && paramValue != "" ){
-      //   response += "servo_1 : " + String(intValue) + ", ";
-      //   servo_1.write(intValue);
-      // }
-      // else if(paramName == "servo_2" && paramValue != "" ){
-      //   response += "servo_2 : " + String(intValue) + ", ";
-      //   servo_2.write(intValue);
-      // }
+      else if(paramName == "servo_relax"){
+        servoRelax = intValue;
+        if (servoRelax == 1){
+          Serial.println("Servo relax");
+          servo_base.detach();
+          servo_1.detach();
+          servo_2.detach();
+          servo_grip.detach();
+        }
+      }
+      else if(paramName == "servo_base" && paramValue != "" && servoRelax!=1){
+        response += "servo_base : " + String(intValue) + ", ";
+
+        servo_base.attach(4);
+
+        if(servoPos_Base < intValue){
+          for (int pos = servoPos_Base; pos <= intValue; pos += 1) {
+            servo_base.write(pos);
+            delay(15);
+          }
+        }else{
+          for (int pos = servoPos_Base; pos >= intValue; pos -= 1) {
+            servo_base.write(pos);
+            delay(15);
+          }
+        }
+        servoPos_Base = intValue;
+
+        // servo_base.write(100);
+        // servo_grip.write(0);
+        // servo_1.write(80);
+        // servo_2.write(50);
+
+      }
+      else if(paramName == "servo_grip" && paramValue != "" && servoRelax!=1){
+        response += "servo_grip : " + String(intValue) + ", ";
+        
+        servo_grip.attach(5);
+
+        if(servoPos_grip < intValue){
+          for (int pos = servoPos_grip; pos <= intValue; pos += 1) {
+            servo_grip.write(pos);
+            delay(20);
+          }
+        }else{
+          for (int pos = servoPos_grip; pos >= intValue; pos -= 1) {
+            servo_grip.write(pos);
+            delay(20);
+          }
+        }
+        servoPos_grip = intValue;
+
+      }
+      else if(paramName == "servo_1" && paramValue != "" && servoRelax!=1){
+        response += "servo_1 : " + String(intValue) + ", ";
+        
+        servo_1.attach(6);
+
+        if(servoPos_1 < intValue){
+          for (int pos = servoPos_1; pos <= intValue; pos += 1) {
+            servo_1.write(pos);
+            delay(25);
+          }
+        }else{
+          for (int pos = servoPos_1; pos >= intValue; pos -= 1) {
+            servo_1.write(pos);
+            delay(25);
+          }
+        }
+        servoPos_1 = intValue;
+
+      }
+      else if(paramName == "servo_2" && paramValue != "" && servoRelax!=1){
+        response += "servo_2 : " + String(intValue) + ", ";
+        
+        servo_2.attach(7);
+
+        if(servoPos_2 < intValue){
+          for (int pos = servoPos_2; pos <= intValue; pos += 1) {
+            servo_2.write(pos);
+            delay(25);
+          }
+        }else{
+          for (int pos = servoPos_2; pos >= intValue; pos -= 1) {
+            servo_2.write(pos);
+            delay(25);
+          }
+        }
+        servoPos_2 = intValue;
+
+      }
 
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
@@ -134,7 +203,7 @@ void X_errFunction(int error){
         }
         
       }
-      NodeMCU.println(response);
+      // NodeMCU.println(response);
       Serial.println(response);
       response = "";
       // Serial.println("Distance in inch : "+inches);

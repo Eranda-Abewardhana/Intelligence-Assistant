@@ -3,6 +3,7 @@ from new import *
 import sys
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
 
 
 class Example(QtWidgets.QMainWindow):
@@ -25,13 +26,13 @@ class Example(QtWidgets.QMainWindow):
         self.ui.horizontalSlider_4.valueChanged.connect(self.sliderChanged)
         self.ui.horizontalSlider_5.valueChanged.connect(self.sliderChanged)
 
-    def sendRequest(self, servo_base, servo_grip, servo_1, servo_2):
-        url = "http://192.168.114.127"
+    def sendRequest(self, stop=0, x_err=0, y_err=0, m_init=0, servo_base=0, servo_grip=0, servo_1=0, servo_2=0):
+        url = "http://192.168.137.45"
         payload = {
-            'stop': 1,
-            'x_err': 0,
-            'y_err': 0,
-            'm_init': 0,
+            'stop': stop,
+            'x_err': x_err,
+            'y_err': y_err,
+            'm_init': m_init,
             'servo_base': servo_base,
             'servo_grip': servo_grip, # MAX 65
             'servo_1': servo_1,
@@ -54,25 +55,23 @@ class Example(QtWidgets.QMainWindow):
         s3 = self.ui.horizontalSlider_3.value()
         s4 = self.ui.horizontalSlider_4.value()
         s5 = self.ui.horizontalSlider_5.value()
-        self.sendRequest(s1, s2, s3, s4)
+        self.sendRequest(servo_base=s1, servo_grip=s2, servo_1=s3, servo_2=s4)
 
 
-    # def mouseMoveEvent(self, QMouseEvent):
-    #     x = QMouseEvent.pos().x()/4
-    #     y = QMouseEvent.pos().y()/4
-    #     print(x, y)
-    #     if(0<x<256 and 0<y<256):
-    #         servo1.write(x)
-    #         servo2.write(y)
-    #         # time.sleep(.3)
-    #         # painter = QPainter(self)
-    #         # painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
-    #         # painter.drawEllipse(QPoint(x,y), 1, 1)
-    #         # painter.end()
+    def mouseMoveEvent(self, QMouseEvent):
+        x = int(QMouseEvent.pos().x()*4-1200)
+        y = int(QMouseEvent.pos().y()*1.2-250)
+        print(x, -y)
+        # self.sendRequest(stop=0, x_err=x, m_init=-y)
+        painter = QPainter(self)
+        painter.setPen(QPen((0,255,0), 2, Qt.SolidLine))
+        painter.drawEllipse(QPoint(x,y), 1, 1)
+        painter.end()
 
-    # def mouseReleaseEvent(self, QMouseEvent):
-    #     cursor = QtGui.QCursor()
-    #     print(cursor.pos())
+    def mouseReleaseEvent(self, QMouseEvent):
+        cursor = QtGui.QCursor()
+        print(cursor.pos())
+        self.sendRequest(stop=1)
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
