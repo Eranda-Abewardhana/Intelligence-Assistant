@@ -1,3 +1,10 @@
+#include <Boards.h>
+#include <Firmata.h>
+#include <FirmataConstants.h>
+#include <FirmataDefines.h>
+#include <FirmataMarshaller.h>
+#include <FirmataParser.h>
+
 #include <Servo.h> // include server library
 
 Servo ser;
