@@ -119,7 +119,7 @@ class ObjectDetection:
                 self.d_error = (errorX - self.last_error) / self.elapsed_time
 
                 finalErr = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
-                # self.sendRequest(stop = 0, x_err = int(finalErr))
+                self.sendRequest(stop = 0, x_err = int(finalErr))
 
                 self.last_error = self.errorX
                 self.last_time = self.current_time
