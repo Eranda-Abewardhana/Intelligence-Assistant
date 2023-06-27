@@ -9,16 +9,16 @@ import requests
 
 class ObjectDetection:
     errorX = 0
-    kp = 0.1  # Proportional gain
-    ki = 0.05  # Integral gain
-    kd = 0.01  # Derivative gain
+    kp = 5  # Proportional gain
+    ki = 0.00  # Integral gain
+    kd = 0.00  # Derivative gain
 
     last_time = 0  # Last time update occurred
     error_sum = 0.0  # Cumulative error
     last_error = 0.0  # Last error
     last_time = 0  # Last time update occurred
 
-    root_url = "http://192.168.234.76"
+    root_url = "http://172.20.10.5"
 
     def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
@@ -54,9 +54,9 @@ class ObjectDetection:
     def sendRequest(self, stop=1, x_err=0, y_err=0, m_init=0):
         try:
             payload = {
-                'stop': stop,
-                'x_err': x_err,
-                'y_err': y_err,
+                'm_stop': stop,
+                'mx_err': x_err,
+                'my_err': y_err,
                 'm_init': m_init,
                 'servo_base': 0,
                 'servo_grip': 0,
@@ -121,7 +121,6 @@ class ObjectDetection:
                 finalErr = self.kp * errorX +self. ki * self.error_sum + self.kd * self.d_error
                 self.sendRequest(stop = 0, x_err = int(finalErr))
 
-                time.sleep(0.1)
                 self.last_error = self.errorX
                 self.last_time = self.current_time
 

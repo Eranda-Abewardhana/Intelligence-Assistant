@@ -1,12 +1,18 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 
-const char *ssid = "DESKTOP_TS_";
-const char *password = "tshotspot1";
+const char *ssid = "Xiaomi";
+const char *password = "CHANNA2001";
 
 const int led = 4;
 WiFiServer server(80);
 SoftwareSerial NodeMCU(D2,D3);
+
+IPAddress local_IP(192, 168, 114, 100); // Set your Static IP address
+IPAddress gateway(192, 168, 114, 200); // Set your Gateway IP address
+IPAddress subnet(255, 255, 0, 0);
+IPAddress primaryDNS(8, 8, 8, 8);   //optional
+IPAddress secondaryDNS(8, 8, 4, 4); //optional
 
 void setup()
 {
@@ -15,6 +21,10 @@ void setup()
 	NodeMCU.begin(9600);
 	pinMode(D2,INPUT);
 	pinMode(D3,OUTPUT);
+
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("STA Failed to configure");
+  }
 
   Serial.print("\nConnecting to.");
   Serial.println(ssid);

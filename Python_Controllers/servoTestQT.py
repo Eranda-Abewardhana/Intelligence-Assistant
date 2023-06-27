@@ -17,10 +17,10 @@ if not hasattr(inspect, 'getargspec'):
 
 board = pyfirmata.Arduino('COM3')
 # servo1 = board.get_pin('d:4:s')
-servo2 = board.get_pin('d:5:s')
-servo3 = board.get_pin('d:6:s')
-servo4 = board.get_pin('d:7:s')
-servo5 = board.get_pin('d:10:s')
+servo2 = board.get_pin('d:4:s')
+servo3 = board.get_pin('d:5:s')
+servo4 = board.get_pin('d:6:s')
+servo5 = board.get_pin('d:7:s')
 
 
 ############################################

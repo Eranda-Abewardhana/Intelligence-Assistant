@@ -56,8 +56,8 @@ void loop() {
       
       int intValue = paramValue.toInt();
 
-      // Serial.print(paramName + " : ");
-      // Serial.println(intValue);
+      Serial.print(paramName + " : ");
+      Serial.println(intValue);
 
       if(paramName == "m_stop"){
         stopVal = intValue;
