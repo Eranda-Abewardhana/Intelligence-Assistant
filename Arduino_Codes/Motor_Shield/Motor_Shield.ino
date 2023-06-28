@@ -1,18 +1,31 @@
-// #include <SoftwareSerial.h>
 #include <Servo.h>
-
-// SoftwareSerial NodeMCU(2,3);
+#include <util/atomic.h>
 
 Servo servo_base, servo_1, servo_2, servo_grip;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
 
-int enA = 10;
-int in1 = A2; // L F
-int in2 = A3; // L B
+#define C1 2 // YELLOW
+#define C2 3 // WHITE
+#define enA 10
+#define in1 A2 // L F
+#define in2 A3 // L B
 
-int enB = 11;
-int in3 = A4; // R F
-int in4 = A5; // R B
+#define C3 4 // YELLOW
+#define C4 5 // WHITE
+#define enB 11
+#define in3 A4 // R F
+#define in4 A5 // R B
+
+volatile int posi[] = {0,0};
+long prevT = 0;
+float eprev[] = {0,0};
+float eintegral[] = {0,0};
+int m1pos=0;
+int m2pos=0;
+
+float kp[] = {3, 3};
+float kd[] = {0.45, 0.45};
+float ki[] = {0.001, 0.001};
 
 String response = "";
 
@@ -23,10 +36,33 @@ int initSpeed = 0;
 int stopVal = 0;
 int servoRelax = 0;
 
+void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
+  analogWrite(pwm,pwmVal);
+  if(dir == 1){
+    digitalWrite(in1,HIGH);
+    digitalWrite(in2,LOW);
+  }
+  else if(dir == -1){
+    digitalWrite(in1,LOW);
+    digitalWrite(in2,HIGH);
+  }
+  else{
+    digitalWrite(in1,LOW);
+    digitalWrite(in2,LOW);
+  }  
+}
+
 void setup() {
   Serial.begin(9600);
-  // NodeMCU.begin(9600);
 
+  pinMode(C1,INPUT);
+  pinMode(C2,INPUT);
+  attachInterrupt(digitalPinToInterrupt(C1),readEncoder1,RISING);
+  
+  pinMode(C3,INPUT);
+  pinMode(C4,INPUT);
+  attachInterrupt(digitalPinToInterrupt(C3),readEncoder2,RISING);
+  
   pinMode(enA, OUTPUT);
   pinMode(in1, OUTPUT);
   pinMode(in2, OUTPUT);
@@ -67,6 +103,12 @@ void loop() {
       }
       else if(paramName == "mx_err"){
         X_errFunction(intValue);
+      }
+      else if(paramName == "m1_pos"){
+        m1pos = intValue;
+      }
+      else if(paramName == "m2_pos"){
+        m2pos = intValue;
       }
       else if(paramName == "my_err"){
         ;
@@ -176,6 +218,45 @@ void loop() {
     }
   }
 
+  // time difference
+  long currT = micros();
+  float deltaT = ((float) (currT - prevT))/( 1.0e6 );
+  prevT = currT;
+
+  int pos[] = {0,0}; 
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    pos[0] = posi[0];
+    pos[1] = posi[1];
+  }
+
+  // error
+  int e1 = pos[0] - m1pos;
+  int e2 = pos[1] - m2pos;
+
+  // derivative
+  float dedt1 = (e1-eprev[0])/(deltaT);
+  float dedt2 = (e2-eprev[1])/(deltaT);
+
+  // integral
+  eintegral[0] = eintegral[0] + e1*deltaT;
+  eintegral[1] = eintegral[1] + e1*deltaT;
+
+  // control signal
+  float u1 = kp[0]*e1 + kd[0]*dedt1 + ki[0]*eintegral[0];
+  float u2 = kp[1]*e2 + kd[1]*dedt2 + ki[1]*eintegral[1];
+
+  // motor power
+  float pwr1 = fabs(u1);
+  pwr1 = constrain(pwr1, 0, 255);
+  float pwr2 = fabs(u2);
+  pwr2 = constrain(pwr2, 0, 255);
+
+  setMotorPos( u1<0 ? -1: 1,pwr1,enA,in1,in2);
+  setMotorPos( u2<0 ? -1: 1,pwr2,enB,in3,in4);
+
+  // store previous error
+  eprev[0] = e1;
+  eprev[1] = e2;
 }
 
 void X_errFunction(int error){
@@ -242,5 +323,24 @@ void motorControl(char pos, char dir, int speed){
       digitalWrite(in1, HIGH);
     else if( dir == 'B' )
       digitalWrite(in2, HIGH);
+  }
+}
+
+void readEncoder1(){
+  int b = digitalRead(C2);
+  if(b > 0){
+    posi[0]++;
+  }
+  else{
+    posi[0]--;
+  }
+}
+void readEncoder2(){
+  int b = digitalRead(C4);
+  if(b > 0){
+    posi[1]++;
+  }
+  else{
+    posi[1]--;
   }
 }

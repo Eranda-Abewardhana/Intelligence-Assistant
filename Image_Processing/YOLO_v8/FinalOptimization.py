@@ -85,6 +85,7 @@ class ObjectDetection:
                 if(class_id == 39):
                     x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
                     detections.append([[x1, y1, x2, y2], score, class_id])
+                    print([[x1, y1, x2, y2], score, class_id])
 
             tracked = self.tracker.update_tracks(detections, frame=frame)
             
