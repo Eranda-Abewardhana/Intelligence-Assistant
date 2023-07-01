@@ -55,7 +55,23 @@ def SendData(data, value):
             data = ser.readline().decode().rstrip()
             print("Response:\n\t", data)
             break
+def UltrasonicData():
+    while True:
+        if ser.in_waiting > 0:
+            data = ser.readline().decode().rstrip()
+            print(data,"\tResponse:\n")
+            delimiterIndex = data.find('distance(cm): ')
+            if delimiterIndex != -1:
+                value = receivedString[delimiterIndex + 1:].strip()
+                distance = int(value)
+                print('distance(cm): ' + distance)
+                if(distance < 20) :
+                    Thread(target=SendData, args=("m_stop", 1)).start()
+            break
 
+# Start the UltrasonicData function in a separate thread
+ultrasonic_thread = Thread(target=UltrasonicData)
+ultrasonic_thread.start()
 
 min_conf_threshold = float(0.5)
 imW, imH = 640,360
@@ -161,7 +177,7 @@ while True:
         d_error = (errorX - last_error) / elapsed_time
 
         finalErr = kp * errorX + ki * error_sum + kd * d_error
-        SendData("servo_base", -int(finalErr))
+        Thread(target=SendData, args=("servo_base", -int(finalErr))).start()
         print(-int(finalErr))
 
         last_error = errorX
@@ -177,7 +193,7 @@ while True:
     frame_rate_calc= 1/time1
 
     if cv2.waitKey(1) == ord('q'):
-        SendData("m_stop", 1)
+        Thread(target=SendData, args=("m_stop", 1)).start()
         ser.close()
         break
 

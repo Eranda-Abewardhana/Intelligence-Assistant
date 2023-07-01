@@ -4,17 +4,29 @@
 Servo servo_base, servo_1, servo_2, servo_grip;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
 
+// Pin definitions for ultrasonic
+const int trigPin = 13;
+const int echoPin = 12;
+
+// Variables
+long duration;
+int distance;
+
 #define C1 2 // YELLOW
-#define C2 3 // WHITE
-#define enA 10
+#define C2 3 // GREEN
+#define enA 10 //PWN1
 #define in1 A2 // L F
 #define in2 A3 // L B
 
 #define C3 4 // YELLOW
-#define C4 5 // WHITE
-#define enB 11
+#define C4 5 // GREEN
+#define enB 11//PWN2
 #define in3 A4 // R F
 #define in4 A5 // R B
+
+// set target position
+int target1[5][3] = {{900, 0, 0.4}, {0, 200, 0.6}, {-900, 0, 0.5}, {0, 200, 0.6}, {0, 0, 0}};
+
 
 volatile int posi[] = {0,0};
 long prevT = 0;
@@ -35,16 +47,20 @@ int initSpeed = 0;
 
 int stopVal = 0;
 int servoRelax = 0;
+int i = 0;
+int x = 100;
 
 void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
   analogWrite(pwm,pwmVal);
   if(dir == 1){
     digitalWrite(in1,HIGH);
     digitalWrite(in2,LOW);
+    delay(1000);
   }
   else if(dir == -1){
     digitalWrite(in1,LOW);
     digitalWrite(in2,HIGH);
+    delay(1000);
   }
   else{
     digitalWrite(in1,LOW);
@@ -54,6 +70,10 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
 
 void setup() {
   Serial.begin(9600);
+
+   // Define pin modes
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 
   pinMode(C1,INPUT);
   pinMode(C2,INPUT);
@@ -79,6 +99,34 @@ void setup() {
 
 void loop() {
 
+    // Clear the trigger pin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  
+  // Set the trigger pin high for 10 microseconds
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Measure the duration of the echo pulse
+  duration = pulseIn(echoPin, HIGH);
+  
+  // Calculate the distance in centimeters
+  distance = duration * 0.034 / 2;
+
+  //  Print the distance
+  Serial.print("distance(cm): "+ distance);
+  Serial.print(distance);
+
+  // if(distance < 20 && i < 5 && (-2 < x < 2)) {
+  // int* target = target1[i];
+  // m1pos = target[0];
+  // m2pos = target[1];
+  // Serial.println(String(m1pos));
+  // Serial.println(String(m2pos));
+  // i++;
+  // }
+
   if (Serial.available()) {
     String receivedString = Serial.readStringUntil('\n');
     
@@ -103,6 +151,7 @@ void loop() {
       }
       else if(paramName == "mx_err"){
         X_errFunction(intValue);
+        x = intValue;
       }
       else if(paramName == "m1_pos"){
         m1pos = intValue;
@@ -260,18 +309,8 @@ void loop() {
 }
 
 void X_errFunction(int error){
-    // digitalWrite(trig,LOW);
-    // delayMicroseconds(2);
-    // digitalWrite(trig,HIGH);
-    // delayMicroseconds(2);
-
-    // long t      = pulseIn(echo,HIGH);
-    // long inches = t / 74 / 2;
-    // long cm = t / 29 / 2;  
-
-    // if(cm > 30) {        
-    // Apply output to motors
-
+   
+ 
       if (stopVal==1){
         analogWrite(enA, 0);
         analogWrite(enB, 0);

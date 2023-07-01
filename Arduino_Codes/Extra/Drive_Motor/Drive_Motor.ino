@@ -2,11 +2,11 @@
 
 #include <util/atomic.h>
 
-#define C1 2 //yellow
-#define C2 3 //green
-#define PWM 11 
-#define IN1 12
-#define IN2 13
+#define C1 4 //yellow
+#define C2 5 //green
+#define PWM 11
+#define IN1 A4
+#define IN2 A5
 
 volatile int posi = 0;
 
