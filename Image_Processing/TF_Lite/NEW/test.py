@@ -66,7 +66,7 @@ def UltrasonicData():
                 distance = int(value)
                 print('distance(cm): ' + distance)
                 if(distance < 20) :
-                    Thread(target=SendData, args=("m_stop", 1)).start()
+                    Thread(target=SendData, args=("m1_pos,m2_pos", 900-200)).start()
             break
 
 # Start the UltrasonicData function in a separate thread

@@ -131,12 +131,23 @@ void loop() {
     String receivedString = Serial.readStringUntil('\n');
     
     int delimiterIndex;
-    while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
+    while ((delimiterIndex = receivedString.indexOf(':')) != -1) {
       String parameter = receivedString.substring(0, delimiterIndex);
-
+      
       int colonIndex = parameter.indexOf(':');
       String paramName = parameter.substring(0, colonIndex);
       String paramValue = parameter.substring(colonIndex + 1);
+
+       if(paramName.indexOf('/')) != -1) {
+        int colonIndex = parameter.indexOf('/');
+        String param1 = parameter.substring(0, colonIndex);
+        String param2 = parameter.substring(colonIndex + 1);
+      }
+       if(paramValue.indexOf(',')) != -1) {
+        int colonIndex = parameter.indexOf('/');
+        int value1 = parameter.substring(0, colonIndex).toInt();
+        int value2 = parameter.substring(colonIndex + 1).toInt();
+      }
       
       int intValue = paramValue.toInt();
 
@@ -153,11 +164,11 @@ void loop() {
         X_errFunction(intValue);
         x = intValue;
       }
-      else if(paramName == "m1_pos"){
-        m1pos = intValue;
+      else if(param1 == "m1_pos"){
+        m1pos = value1;
       }
-      else if(paramName == "m2_pos"){
-        m2pos = intValue;
+      else if(param2 == "m2_pos"){
+        m2pos = value2;
       }
       else if(paramName == "my_err"){
         ;
