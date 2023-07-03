@@ -16,6 +16,8 @@ last_time = 0  # Last time update occurred
 error_sum = 0.0  # Cumulative error
 last_error = 0.0  # Last error
 
+distance = 0
+
 ser = serial.Serial('/dev/ttyACM0', 9600)
 
 class VideoStream:
@@ -62,17 +64,18 @@ def UltrasonicData():
             print(data,"\tResponse:\n")
             delimiterIndex = data.find('distance(cm): ')
             if delimiterIndex != -1:
-                value = receivedString[delimiterIndex + 1:].strip()
+                value = data[delimiterIndex + 1:].strip()
                 distance = int(value)
                 print('distance(cm): ' + distance)
-                if(distance < 20) :
-                    Thread(target=SendData, args=("m1_pos,m2_pos", 900-200)).start()
+                sleep(1)
+                
             break
 
 # Start the UltrasonicData function in a separate thread
 ultrasonic_thread = Thread(target=UltrasonicData)
 ultrasonic_thread.start()
-
+if(distance < 20 ) :
+            Thread(target=SendData, args=("m1_pos,m2_pos:", 900,200)).start()
 min_conf_threshold = float(0.5)
 imW, imH = 640,360
 

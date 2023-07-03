@@ -115,8 +115,8 @@ void loop() {
   distance = duration * 0.034 / 2;
 
   //  Print the distance
-  Serial.print("distance(cm): "+ distance);
-  Serial.print(distance);
+  Serial.println("distance(cm): " + String(distance));
+//  Serial.print(distance);
 
   // if(distance < 20 && i < 5 && (-2 < x < 2)) {
   // int* target = target1[i];
@@ -137,16 +137,17 @@ void loop() {
       int colonIndex = parameter.indexOf(':');
       String paramName = parameter.substring(0, colonIndex);
       String paramValue = parameter.substring(colonIndex + 1);
-
-       if(paramName.indexOf('/')) != -1) {
+      String param1,param2;
+      int value2,value1;
+       if(paramName.indexOf('/') != -1) {
         int colonIndex = parameter.indexOf('/');
-        String param1 = parameter.substring(0, colonIndex);
-        String param2 = parameter.substring(colonIndex + 1);
+        param1 = parameter.substring(0, colonIndex);
+        param2 = parameter.substring(colonIndex + 1);
       }
-       if(paramValue.indexOf(',')) != -1) {
+       if(paramValue.indexOf(',') != -1) {
         int colonIndex = parameter.indexOf('/');
-        int value1 = parameter.substring(0, colonIndex).toInt();
-        int value2 = parameter.substring(colonIndex + 1).toInt();
+        value1 = parameter.substring(0, colonIndex).toInt();
+        value2 = parameter.substring(colonIndex + 1).toInt();
       }
       
       int intValue = paramValue.toInt();
