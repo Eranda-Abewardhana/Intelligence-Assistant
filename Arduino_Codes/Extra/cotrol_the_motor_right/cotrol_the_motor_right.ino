@@ -2,11 +2,11 @@
 
 #include <util/atomic.h> // For the ATOMIC_BLOCK macro
 
-#define C1 2 // YELLOW
-#define C2 3 // WHITE
-#define PWM 7
-#define IN2 8
-#define IN1 9
+#define C1 18 // YELLOW
+#define C2 16 // GREEN
+#define PWM 11
+#define IN2 A2
+#define IN1 A3
 
 volatile int posi = 0; // specify posi as volatile: https://www.arduino.cc/reference/en/language/variables/variable-scope-qualifiers/volatile/
 long prevT = 0;

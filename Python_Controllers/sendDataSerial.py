@@ -1,11 +1,11 @@
 import serial
 import time
 
-ser = serial.Serial('COM8', 9600)  # Replace '/dev/ttyUSB0' with the appropriate port
+ser = serial.Serial('COM10', 9600)  # Replace '/dev/ttyUSB0' with the appropriate port
 
 time.sleep(2)
 
-command = "m1_pos:100, #:#"
+command = "m2_pos:1000, #:#"
 ser.write(command.encode())
 
 while True:

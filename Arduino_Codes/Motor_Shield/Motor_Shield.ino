@@ -4,28 +4,23 @@
 Servo servo_base, servo_1, servo_2, servo_grip;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
 
-// Pin definitions for ultrasonic
-const int trigPin = 13;
-const int echoPin = 12;
+const int trigPin = 25;
+const int echoPin = 23;
 
-// Variables
 long duration;
 int distance;
 
-#define C1 2 // YELLOW
-#define C2 3 // GREEN
-#define enA 10 //PWN1
+#define C1 18 // YELLOW
+#define C2 16 // GREEN
+#define enA 11 //PWN1
 #define in1 A2 // L F
 #define in2 A3 // L B
 
-#define C3 4 // YELLOW
-#define C4 5 // GREEN
-#define enB 11//PWN2
+#define C3 19 // YELLOW
+#define C4 17 // GREEN
+#define enB 10//PWN2
 #define in3 A4 // R F
 #define in4 A5 // R B
-
-// set target position
-int target1[5][3] = {{900, 0, 0.4}, {0, 200, 0.6}, {-900, 0, 0.5}, {0, 200, 0.6}, {0, 0, 0}};
 
 
 volatile int posi[] = {0,0};
@@ -41,8 +36,6 @@ float ki[] = {0.001, 0.001};
 
 String response = "";
 
-int trig = 8;
-int echo = 9;
 int initSpeed = 0;
 
 int stopVal = 0;
@@ -55,12 +48,10 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
   if(dir == 1){
     digitalWrite(in1,HIGH);
     digitalWrite(in2,LOW);
-    delay(1000);
   }
   else if(dir == -1){
     digitalWrite(in1,LOW);
     digitalWrite(in2,HIGH);
-    delay(1000);
   }
   else{
     digitalWrite(in1,LOW);
@@ -71,7 +62,6 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
 void setup() {
   Serial.begin(9600);
 
-   // Define pin modes
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
 
@@ -99,59 +89,55 @@ void setup() {
 
 void loop() {
 
-    // Clear the trigger pin
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
+  //   // Clear the trigger pin
+  // digitalWrite(trigPin, LOW);
+  // delayMicroseconds(2);
   
-  // Set the trigger pin high for 10 microseconds
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  // // Set the trigger pin high for 10 microseconds
+  // digitalWrite(trigPin, HIGH);
+  // delayMicroseconds(10);
+  // digitalWrite(trigPin, LOW);
   
-  // Measure the duration of the echo pulse
-  duration = pulseIn(echoPin, HIGH);
+  // // Measure the duration of the echo pulse
+  // duration = pulseIn(echoPin, HIGH);
   
-  // Calculate the distance in centimeters
-  distance = duration * 0.034 / 2;
+  // // Calculate the distance in centimeters
+  // distance = duration * 0.034 / 2;
 
-  //  Print the distance
-  Serial.println("distance(cm): " + String(distance));
-//  Serial.print(distance);
-
-  // if(distance < 20 && i < 5 && (-2 < x < 2)) {
-  // int* target = target1[i];
-  // m1pos = target[0];
-  // m2pos = target[1];
-  // Serial.println(String(m1pos));
-  // Serial.println(String(m2pos));
-  // i++;
-  // }
+  // //  Print the distance
+  // Serial.println("distance(cm): " + String(distance));
+  // //  Serial.print(distance);
 
   if (Serial.available()) {
     String receivedString = Serial.readStringUntil('\n');
+    int paramValue1 = 0;
+    int paramValue2 = 0;
     
     int delimiterIndex;
-    while ((delimiterIndex = receivedString.indexOf(':')) != -1) {
-      String parameter = receivedString.substring(0, delimiterIndex);
-      
-      int colonIndex = parameter.indexOf(':');
-      String paramName = parameter.substring(0, colonIndex);
-      String paramValue = parameter.substring(colonIndex + 1);
-      String param1,param2;
-      int value2,value1;
-       if(paramName.indexOf('/') != -1) {
-        int colonIndex = parameter.indexOf('/');
-        param1 = parameter.substring(0, colonIndex);
-        param2 = parameter.substring(colonIndex + 1);
-      }
-       if(paramValue.indexOf(',') != -1) {
-        int colonIndex = parameter.indexOf('/');
-        value1 = parameter.substring(0, colonIndex).toInt();
-        value2 = parameter.substring(colonIndex + 1).toInt();
-      }
-      
-      int intValue = paramValue.toInt();
+    while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
+      String paramName = receivedString.substring(0, delimiterIndex);
+      String paramValue = receivedString.substring( delimiterIndex + 1 );
+      int intValue = 0;
+      String paramName1;
+      String paramName2;
+      int paramValue1;
+      int paramValue2;
 
+      if(paramName.indexOf(':') != -1) {
+        int colonIndex = paramName.indexOf(':');
+        paramName1 = paramName.substring(0, colonIndex);
+        paramValue1 =( paramName.substring(colonIndex + 1 )).toInt();
+      }
+    
+      if(paramValue.indexOf(':') != -1) {
+        int colonIndex = paramValue.indexOf(':');
+        paramName2 = paramValue.substring(0, colonIndex);
+        paramValue2 =( paramValue.substring(colonIndex + 1)).toInt();
+      }
+      else {
+        intValue = paramValue.toInt();
+      }   
+      
       Serial.print(paramName + " : ");
       Serial.println(intValue);
 
@@ -165,11 +151,11 @@ void loop() {
         X_errFunction(intValue);
         x = intValue;
       }
-      else if(param1 == "m1_pos"){
-        m1pos = value1;
+      else if(paramName1 == "m1_pos"){
+        m1pos = paramValue1;
       }
-      else if(param2 == "m2_pos"){
-        m2pos = value2;
+      else if(paramName2 == "m2_pos"){
+        m2pos = paramValue2;
       }
       else if(paramName == "my_err"){
         ;
@@ -300,7 +286,7 @@ void loop() {
 
   // integral
   eintegral[0] = eintegral[0] + e1*deltaT;
-  eintegral[1] = eintegral[1] + e1*deltaT;
+  eintegral[1] = eintegral[1] + e2*deltaT;
 
   // control signal
   float u1 = kp[0]*e1 + kd[0]*dedt1 + ki[0]*eintegral[0];
@@ -321,8 +307,6 @@ void loop() {
 }
 
 void X_errFunction(int error){
-   
- 
       if (stopVal==1){
         analogWrite(enA, 0);
         analogWrite(enB, 0);
