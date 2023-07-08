@@ -181,7 +181,7 @@ while True:
         d_error = (errorX - last_error) / elapsed_time
 
         finalErr = kp * errorX + ki * error_sum + kd * d_error
-        Thread(target=SendData, args=("servo_base", -int(finalErr))).start()
+        # Thread(target=SendData, args=("servo_base", -int(finalErr))).start()
         print(-int(finalErr))
 
         last_error = errorX

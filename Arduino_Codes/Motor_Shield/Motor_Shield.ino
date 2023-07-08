@@ -110,34 +110,17 @@ void loop() {
 
   if (Serial.available()) {
     String receivedString = Serial.readStringUntil('\n');
-    int paramValue1 = 0;
-    int paramValue2 = 0;
-    
     int delimiterIndex;
-    while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
-      String paramName = receivedString.substring(0, delimiterIndex);
-      String paramValue = receivedString.substring( delimiterIndex + 1 );
-      int intValue = 0;
-      String paramName1;
-      String paramName2;
-      int paramValue1;
-      int paramValue2;
 
-      if(paramName.indexOf(':') != -1) {
-        int colonIndex = paramName.indexOf(':');
-        paramName1 = paramName.substring(0, colonIndex);
-        paramValue1 =( paramName.substring(colonIndex + 1 )).toInt();
-      }
-    
-      if(paramValue.indexOf(':') != -1) {
-        int colonIndex = paramValue.indexOf(':');
-        paramName2 = paramValue.substring(0, colonIndex);
-        paramValue2 =( paramValue.substring(colonIndex + 1)).toInt();
-      }
-      else {
-        intValue = paramValue.toInt();
-      }   
+    while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
+      String parameter = receivedString.substring(0, delimiterIndex);
+
+      int colonIndex = parameter.indexOf(':');
+      String paramName = parameter.substring(0, colonIndex);
+      String paramValue = parameter.substring(colonIndex + 1);
       
+      int intValue = paramValue.toInt();
+
       Serial.print(paramName + " : ");
       Serial.println(intValue);
 
@@ -151,11 +134,11 @@ void loop() {
         X_errFunction(intValue);
         x = intValue;
       }
-      else if(paramName1 == "m1_pos"){
-        m1pos = paramValue1;
+      else if(paramName == "m1_pos"){
+        m1pos += intValue;
       }
-      else if(paramName2 == "m2_pos"){
-        m2pos = paramValue2;
+      else if(paramName == "m2_pos"){
+        m2pos += intValue;
       }
       else if(paramName == "my_err"){
         ;
