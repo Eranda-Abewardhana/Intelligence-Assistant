@@ -18,11 +18,12 @@ last_error = 0.0  # Last error
 
 distance = 0
 
-ser = serial.Serial('/dev/ttyACM0', 9600)
+try: ser = serial.Serial('/dev/ttyACM0', 9600)
+except: pass
 
 class VideoStream:
     def __init__(self,resolution=(640,480),framerate=30):
-        self.stream = cv2.VideoCapture(0)
+        self.stream = cv2.VideoCapture(1)
         ret = self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         ret = self.stream.set(3,resolution[0])
         ret = self.stream.set(4,resolution[1])
@@ -67,7 +68,7 @@ def UltrasonicData():
             if delimiterIndex != -1:
                 value = data[delimiterIndex + 1:].strip()
                 distance = int(value)
-                print("distance(cm): " + distance)
+                print("distance(cm): " , distance)
                 sleep(1)
             break
 
@@ -80,8 +81,8 @@ def UltrasonicData():
 min_conf_threshold = float(0.5)
 imW, imH = 640,360
 
-PATH_TO_CKPT = "Image_Processing/TF_Lite/NEW/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/detect.tflite"
-PATH_TO_LABELS = "Image_Processing/TF_Lite/NEW/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/labelmap.txt"
+PATH_TO_CKPT = "Image_Processing/TF_Lite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/detect.tflite"
+PATH_TO_LABELS = "Image_Processing/TF_Lite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/labelmap.txt"
 
 with open(PATH_TO_LABELS, 'r') as f:
     labels = [line.strip() for line in f.readlines()]
@@ -198,7 +199,8 @@ while True:
 
     if cv2.waitKey(1) == ord('q'):
         Thread(target=SendData, args=("m_stop", 1)).start()
-        ser.close()
+        try: ser.close()
+        except: pass
         break
 
 cv2.destroyAllWindows()

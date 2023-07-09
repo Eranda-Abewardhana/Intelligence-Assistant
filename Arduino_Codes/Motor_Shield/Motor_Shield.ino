@@ -3,6 +3,7 @@
 
 Servo servo_base, servo_1, servo_2, servo_grip;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
+int servoPos_Base_temp=0, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0;
 
 const int trigPin = 25;
 const int echoPin = 23;
@@ -40,8 +41,6 @@ int initSpeed = 0;
 
 int stopVal = 0;
 int servoRelax = 0;
-int i = 0;
-int x = 100;
 
 void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
   analogWrite(pwm,pwmVal);
@@ -85,6 +84,15 @@ void setup() {
   servoPos_2 = 26;
   servoPos_grip = 55;
   
+  servo_base.attach(4);
+  servo_1.attach(6);
+  servo_2.attach(7);
+  servo_grip.attach(5);
+  
+  servo_base.write(servoPos_Base);
+  servo_1.write(servoPos_1);
+  servo_2.write(servoPos_2);
+  servo_grip.write(servoPos_grip);
 }
 
 void loop() {
@@ -121,8 +129,8 @@ void loop() {
       
       int intValue = paramValue.toInt();
 
-      Serial.print(paramName + " : ");
-      Serial.println(intValue);
+      // Serial.print(paramName + " : ");
+      // Serial.println(intValue);
 
       if(paramName == "m_stop"){
         stopVal = intValue;
@@ -132,13 +140,14 @@ void loop() {
       }
       else if(paramName == "mx_err"){
         X_errFunction(intValue);
-        x = intValue;
       }
       else if(paramName == "m1_pos"){
         m1pos += intValue;
+        response += "M1 pos : " + String(intValue) + ", ";
       }
       else if(paramName == "m2_pos"){
         m2pos += intValue;
+        response += "M2 pos : " + String(intValue) + ", ";
       }
       else if(paramName == "my_err"){
         ;
@@ -146,106 +155,100 @@ void loop() {
       else if(paramName == "servo_relax"){
         servoRelax = intValue;
         if (servoRelax == 1){
-          Serial.println("Servo relax");
+          response += "Servo relax, ";
           servo_base.detach();
           servo_1.detach();
           servo_2.detach();
           servo_grip.detach();
         }
       }
+      else if(paramName == "servo_relax_pos" && intValue == 1){
+          response += "Servo relax Pos, ";
+
+          servo_base.attach(4);
+          servo_1.attach(6);
+          servo_2.attach(7);
+          servo_grip.attach(5);
+          
+          servo_base.write(100);
+          servo_1.write(78);
+          servo_2.write(26);
+          servo_grip.write(0);
+      }
       else if(paramName == "servo_base" && paramValue != "" && servoRelax!=1){
         response += "servo_base : " + String(intValue) + ", ";
-
-        servo_base.attach(4);
-
-        if(intValue >= 0){
-          while(intValue >= 0){
-            servoPos_Base += 1;
-            intValue -= 1;
-            servo_base.write(servoPos_Base);
-            delay(15);
-          }
-        }else{
-          while(intValue < 0){
-            servoPos_Base -= 1;
-            intValue += 1;
-            servo_base.write(servoPos_Base);
-            delay(15);
-          }
-        }
-
-        // servo_base.write(100);
-        // servo_grip.write(0);
-        // servo_1.write(80);
-        // servo_2.write(50);
-
+        servoPos_Base_temp = intValue;
       }
       else if(paramName == "servo_grip" && paramValue != "" && servoRelax!=1){
         response += "servo_grip : " + String(intValue) + ", ";
-        
-        servo_grip.attach(5);
-
-        if(servoPos_grip < intValue){
-          for (int pos = servoPos_grip; pos <= intValue; pos += 1) {
-            servo_grip.write(pos);
-            delay(20);
-          }
-        }else{
-          for (int pos = servoPos_grip; pos >= intValue; pos -= 1) {
-            servo_grip.write(pos);
-            delay(20);
-          }
-        }
-        servoPos_grip = intValue;
-
+        servoPos_grip_temp = intValue;
       }
       else if(paramName == "servo_1" && paramValue != "" && servoRelax!=1){
         response += "servo_1 : " + String(intValue) + ", ";
-        
-        servo_1.attach(6);
-
-        if(intValue >= 0){
-          while(intValue >= 0){
-            servoPos_1 += 1;
-            intValue -= 1;
-            servo_1.write(servoPos_1);
-            delay(25);
-          }
-        }else{
-          while(intValue < 0){
-            servoPos_1 -= 1;
-            intValue += 1;
-            servo_1.write(servoPos_1);
-            delay(25);
-          }
-        }
-
+        servoPos_1_temp = intValue;
       }
       else if(paramName == "servo_2" && paramValue != "" && servoRelax!=1){
         response += "servo_2 : " + String(intValue) + ", ";
-        
-        servo_2.attach(7);
-
-        if(intValue >= 0){
-          while(intValue >= 0){
-            servoPos_2 += 1;
-            intValue -= 1;
-            servo_2.write(servoPos_2);
-            delay(25);
-          }
-        }else{
-          while(intValue < 0){
-            servoPos_2 -= 1;
-            intValue += 1;
-            servo_2.write(servoPos_2);
-            delay(25);
-          }
-        }
-        
+        servoPos_2_temp = intValue;
       }
 
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
+    
+    Serial.println(">> "+ response);
+    response = "";
+  }
+
+  while(servoPos_Base_temp > 0){
+    servoPos_Base += 1;
+    servoPos_Base_temp -= 1;
+    servo_base.write(servoPos_Base);
+    delay(35);
+  }
+  while(servoPos_Base_temp < 0){
+    servoPos_Base -= 1;
+    servoPos_Base_temp += 1;
+    servo_base.write(servoPos_Base);
+    delay(35);
+  }
+
+  if(servoPos_grip < servoPos_grip_temp){
+    for (int pos = servoPos_grip; pos <= servoPos_grip_temp; pos += 1) {
+      servo_grip.write(pos);
+      delay(20);
+    }
+  }else if(servoPos_grip > servoPos_grip_temp){
+    for (int pos = servoPos_grip; pos >= servoPos_grip_temp; pos -= 1) {
+      servo_grip.write(pos);
+      delay(20);
+    }
+  }
+  servoPos_grip = servoPos_grip_temp;
+
+  while(servoPos_1_temp > 0){
+    servoPos_1 += 1;
+    servoPos_1_temp -= 1;
+    servo_1.write(servoPos_1);
+    delay(25);
+  }
+  while(servoPos_1_temp < 0){
+    servoPos_1 -= 1;
+    servoPos_1_temp += 1;
+    servo_1.write(servoPos_1);
+    delay(25);
+  }
+  
+  while(servoPos_2_temp > 0){
+    servoPos_2 += 1;
+    servoPos_2_temp -= 1;
+    servo_2.write(servoPos_2);
+    delay(25);
+  }
+  while(servoPos_2_temp < 0){
+    servoPos_2 -= 1;
+    servoPos_2_temp += 1;
+    servo_2.write(servoPos_2);
+    delay(25);
   }
 
   // time difference
@@ -312,13 +315,8 @@ void X_errFunction(int error){
         }
         
       }
-      // NodeMCU.println(response);
       Serial.println(response);
       response = "";
-      // Serial.println("Distance in inch : "+inches);
-      // Serial.println("Distance in cm : "+cm);
-    // }
-    
 }
 
 void motorControl(char pos, char dir, int speed){

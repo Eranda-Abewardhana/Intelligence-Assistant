@@ -5,7 +5,7 @@ ser = serial.Serial('COM10', 9600)  # Replace '/dev/ttyUSB0' with the appropriat
 
 time.sleep(2)
 
-command = "m1_pos:1000,m2_pos:-1000, #:#"
+command = "servo_2:5, #:#"
 ser.write(command.encode())
 
 while True:
