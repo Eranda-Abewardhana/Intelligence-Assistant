@@ -142,7 +142,7 @@ while True:
 
     detections = []
     for i in range(len(scores)):
-        if (int(classes[i])==0 and (scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
+        if (int(classes[i])==40 and (scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
             ymin = int(max(1,(boxes[i][0] * imH)))
             xmin = int(max(1,(boxes[i][1] * imW)))
             ymax = int(min(imH,(boxes[i][2] * imH)))

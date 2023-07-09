@@ -1,6 +1,12 @@
 #include <Servo.h>
 #include <util/atomic.h>
 
+const int BUFFER_SIZE = 64;
+
+char buffer[BUFFER_SIZE];
+volatile int bufferIndex = 0;
+bool newCommand = false;
+
 Servo servo_base, servo_1, servo_2, servo_grip;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
 int servoPos_Base_temp=0, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0;
@@ -61,10 +67,8 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
 }
 
 void setup() {
-  Serial.begin(9600);
-
   Serial3.begin(9600); // Bluetooth serial communication will happen on pins 2 and 3
-  Serial.begin(9600); // Serial communication to check the data on the Serial Monitor
+  Serial.begin(115200); // Serial communication to check the data on the Serial Monitor
   pinMode(13, OUTPUT); // LED connected to pin 13
 
   pinMode(trigPin, OUTPUT);
@@ -122,45 +126,59 @@ void loop() {
   // Serial.println("distance(cm): " + String(distance));
   // //  Serial.print(distance);
 
-     while (Serial3.available()){
-        delay(10);
-        char c = Serial3.read();
-        state += c;
-      }
+  //    while (Serial3.available()){
+  //       delay(10);
+  //       char c = Serial3.read();
+  //       state += c;
+  //     }
 
-  if (state.length() > 0) 
-  {
-    Serial.println(state);
+  // if (state.length() > 0) 
+  // {
+  //   Serial.println(state);
 
-    // Check if the word "bottle" is present in the received string
-    if (state.indexOf("bottle") != -1) {
-      Serial.println("bottle");
-      // Execute your code here if "bottle" is found
-    }
+  //   // Check if the word "bottle" is present in the received string
+  //   if (state.indexOf("bottle") != -1) {
+  //     Serial.println("bottle");
+  //     // Execute your code here if "bottle" is found
+  //   }
     
-    else if (state.indexOf("watch") != -1) {
-      Serial.println("watch");
-      // Execute your code here if "watch" is found
-    } 
+  //   else if (state.indexOf("watch") != -1) {
+  //     Serial.println("watch");
+  //     // Execute your code here if "watch" is found
+  //   } 
 
-    else if (state.indexOf("medicine") != -1) {
-      Serial.println("medicine");
-      // Execute your code here if "medicine" is found
-    } 
+  //   else if (state.indexOf("medicine") != -1) {
+  //     Serial.println("medicine");
+  //     // Execute your code here if "medicine" is found
+  //   } 
 
-    else if (state.indexOf("lipstick") != -1) {
-      Serial.println("lipstick");
-      // Execute your code here if "lipstick" is found
-    } 
+  //   else if (state.indexOf("lipstick") != -1) {
+  //     Serial.println("lipstick");
+  //     // Execute your code here if "lipstick" is found
+  //   } 
 
-     //else { }
+  //    //else { }
   
 
-    state = "";
+  //   state = "";
+  // }
+
+
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '\n') {
+      buffer[bufferIndex] = '\0'; // Null-terminate the buffer
+      newCommand = true; // Set the flag to indicate a new message is ready
+      bufferIndex = 0; // Reset buffer index for the next message
+    } else {
+      buffer[bufferIndex] = c;
+      bufferIndex = (bufferIndex + 1) % BUFFER_SIZE; // Wrap around the buffer if needed
+    }
   }
 
-  if (Serial.available()) {
-    String receivedString = Serial.readStringUntil('\n');
+  if (newCommand) {
+    String receivedString = String(buffer);
     int delimiterIndex;
 
     while ((delimiterIndex = receivedString.indexOf(',')) != -1) {
@@ -240,19 +258,20 @@ void loop() {
     
     Serial.println(">> "+ response);
     response = "";
+    newCommand = false;
   }
 
   while(servoPos_Base_temp > 0){
     servoPos_Base += 1;
     servoPos_Base_temp -= 1;
     servo_base.write(servoPos_Base);
-    delay(35);
+    // delay(35);
   }
   while(servoPos_Base_temp < 0){
     servoPos_Base -= 1;
     servoPos_Base_temp += 1;
     servo_base.write(servoPos_Base);
-    delay(35);
+    // delay(35);
   }
 
   if(servoPos_grip < servoPos_grip_temp){
@@ -272,26 +291,26 @@ void loop() {
     servoPos_1 += 1;
     servoPos_1_temp -= 1;
     servo_1.write(servoPos_1);
-    delay(25);
+    // delay(25);
   }
   while(servoPos_1_temp < 0){
     servoPos_1 -= 1;
     servoPos_1_temp += 1;
     servo_1.write(servoPos_1);
-    delay(25);
+    // delay(25);
   }
   
   while(servoPos_2_temp > 0){
     servoPos_2 += 1;
     servoPos_2_temp -= 1;
     servo_2.write(servoPos_2);
-    delay(25);
+    // delay(25);
   }
   while(servoPos_2_temp < 0){
     servoPos_2 -= 1;
     servoPos_2_temp += 1;
     servo_2.write(servoPos_2);
-    delay(25);
+    // delay(25);
   }
 
   // time difference
