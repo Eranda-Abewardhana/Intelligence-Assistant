@@ -1,5 +1,6 @@
 #include <Servo.h>
 #include <util/atomic.h>
+#include <NewPing.h>
 
 const int BUFFER_SIZE = 64;
 
@@ -7,17 +8,16 @@ char buffer[BUFFER_SIZE];
 volatile int bufferIndex = 0;
 bool newCommand = false;
 
-Servo servo_base, servo_1, servo_2, servo_grip;
-int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2;
-int servoPos_Base_temp=0, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0;
+Servo servo_base, servo_1, servo_2, servo_grip, servo_cam;
+int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2, servoPos_cam;
+int servoPos_Base_temp=0, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0, servoPos_cam_temp=0;
 
-const int trigPin = 25;
-const int echoPin = 23;
+const int TRIGGER_PIN = 25;
+const int ECHO_PIN = 23;
 
-String state; // String to store incoming message from Bluetooth
+String state;
 
-long duration;
-int distance;
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, 200);
 
 #define C1 18 // YELLOW
 #define C2 16 // GREEN
@@ -71,9 +71,6 @@ void setup() {
   Serial.begin(115200); // Serial communication to check the data on the Serial Monitor
   pinMode(13, OUTPUT); // LED connected to pin 13
 
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-
   pinMode(C1,INPUT);
   pinMode(C2,INPUT);
   attachInterrupt(digitalPinToInterrupt(C1),readEncoder1,RISING);
@@ -93,38 +90,22 @@ void setup() {
   servoPos_1 = 78;
   servoPos_2 = 26;
   servoPos_grip = 55;
+  servoPos_cam = 180;
   
   servo_base.attach(4);
   servo_1.attach(6);
   servo_2.attach(7);
   servo_grip.attach(5);
+  servo_cam.attach(8);
   
   servo_base.write(servoPos_Base);
   servo_1.write(servoPos_1);
   servo_2.write(servoPos_2);
   servo_grip.write(servoPos_grip);
+  servo_cam.write(servoPos_cam);
 }
 
 void loop() {
-
-  //   // Clear the trigger pin
-  // digitalWrite(trigPin, LOW);
-  // delayMicroseconds(2);
-  
-  // // Set the trigger pin high for 10 microseconds
-  // digitalWrite(trigPin, HIGH);
-  // delayMicroseconds(10);
-  // digitalWrite(trigPin, LOW);
-  
-  // // Measure the duration of the echo pulse
-  // duration = pulseIn(echoPin, HIGH);
-  
-  // // Calculate the distance in centimeters
-  // distance = duration * 0.034 / 2;
-
-  // //  Print the distance
-  // Serial.println("distance(cm): " + String(distance));
-  // //  Serial.print(distance);
 
   //    while (Serial3.available()){
   //       delay(10);
@@ -239,19 +220,33 @@ void loop() {
       else if(paramName == "servo_base" && paramValue != "" && servoRelax!=1){
         response += "servo_base : " + String(intValue) + ", ";
         servoPos_Base_temp = intValue;
+        servo_base.write(intValue);
       }
       else if(paramName == "servo_grip" && paramValue != "" && servoRelax!=1){
         response += "servo_grip : " + String(intValue) + ", ";
         servoPos_grip_temp = intValue;
+        servo_grip.write(intValue);
       }
       else if(paramName == "servo_1" && paramValue != "" && servoRelax!=1){
         response += "servo_1 : " + String(intValue) + ", ";
         servoPos_1_temp = intValue;
+        servo_1.write(int(intValue*2/3));
       }
       else if(paramName == "servo_2" && paramValue != "" && servoRelax!=1){
         response += "servo_2 : " + String(intValue) + ", ";
         servoPos_2_temp = intValue;
+        servo_2.write(int(intValue*2/3));
       }
+      else if(paramName == "servo_cam" && paramValue != "" && servoRelax!=1){
+        response += "servo_cam : " + String(intValue) + ", ";
+        servoPos_cam_temp = intValue;
+        servo_cam.write(intValue);
+      }
+      else if(paramName == "distance" && paramValue != "" && servoRelax!=1){
+        unsigned int distance = sonar.ping_cm();
+        response += "Distance : " + String(distance) + ", ";
+      }
+
 
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
@@ -261,57 +256,57 @@ void loop() {
     newCommand = false;
   }
 
-  while(servoPos_Base_temp > 0){
-    servoPos_Base += 1;
-    servoPos_Base_temp -= 1;
-    servo_base.write(servoPos_Base);
-    // delay(35);
-  }
-  while(servoPos_Base_temp < 0){
-    servoPos_Base -= 1;
-    servoPos_Base_temp += 1;
-    servo_base.write(servoPos_Base);
-    // delay(35);
-  }
+  // while(servoPos_Base_temp > 0){
+  //   servoPos_Base += 1;
+  //   servoPos_Base_temp -= 1;
+  //   servo_base.write(servoPos_Base);
+  //   delay(20);
+  // }
+  // while(servoPos_Base_temp < 0){
+  //   servoPos_Base -= 1;
+  //   servoPos_Base_temp += 1;
+  //   servo_base.write(servoPos_Base);
+  //   delay(20);
+  // }
 
-  if(servoPos_grip < servoPos_grip_temp){
-    for (int pos = servoPos_grip; pos <= servoPos_grip_temp; pos += 1) {
-      servo_grip.write(pos);
-      delay(20);
-    }
-  }else if(servoPos_grip > servoPos_grip_temp){
-    for (int pos = servoPos_grip; pos >= servoPos_grip_temp; pos -= 1) {
-      servo_grip.write(pos);
-      delay(20);
-    }
-  }
-  servoPos_grip = servoPos_grip_temp;
+  // if(servoPos_grip < servoPos_grip_temp){
+  //   for (int pos = servoPos_grip; pos <= servoPos_grip_temp; pos += 1) {
+  //     servo_grip.write(pos);
+  //     delay(20);
+  //   }
+  // }else if(servoPos_grip > servoPos_grip_temp){
+  //   for (int pos = servoPos_grip; pos >= servoPos_grip_temp; pos -= 1) {
+  //     servo_grip.write(pos);
+  //     delay(20);
+  //   }
+  // }
+  // servoPos_grip = servoPos_grip_temp;
 
-  while(servoPos_1_temp > 0){
-    servoPos_1 += 1;
-    servoPos_1_temp -= 1;
-    servo_1.write(servoPos_1);
-    // delay(25);
-  }
-  while(servoPos_1_temp < 0){
-    servoPos_1 -= 1;
-    servoPos_1_temp += 1;
-    servo_1.write(servoPos_1);
-    // delay(25);
-  }
+  // while(servoPos_1_temp > 0){
+  //   servoPos_1 += 1;
+  //   servoPos_1_temp -= 1;
+  //   servo_1.write(servoPos_1);
+  //   delay(25);
+  // }
+  // while(servoPos_1_temp < 0){
+  //   servoPos_1 -= 1;
+  //   servoPos_1_temp += 1;
+  //   servo_1.write(servoPos_1);
+  //   delay(25);
+  // }
   
-  while(servoPos_2_temp > 0){
-    servoPos_2 += 1;
-    servoPos_2_temp -= 1;
-    servo_2.write(servoPos_2);
-    // delay(25);
-  }
-  while(servoPos_2_temp < 0){
-    servoPos_2 -= 1;
-    servoPos_2_temp += 1;
-    servo_2.write(servoPos_2);
-    // delay(25);
-  }
+  // while(servoPos_2_temp > 0){
+  //   servoPos_2 += 1;
+  //   servoPos_2_temp -= 1;
+  //   servo_2.write(servoPos_2);
+  //   // delay(25);
+  // }
+  // while(servoPos_2_temp < 0){
+  //   servoPos_2 -= 1;
+  //   servoPos_2_temp += 1;
+  //   servo_2.write(servoPos_2);
+  //   // delay(25);
+  // }
 
   // time difference
   long currT = micros();
