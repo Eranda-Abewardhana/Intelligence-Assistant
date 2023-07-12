@@ -10,11 +10,29 @@ import math
 try: ser = serial.Serial('COM10', 115200)
 except: print("No serial")
 
-
 def calculate_angle_base(angle, distance):
     numerator = float(distance) * math.sin(math.radians(angle))
     denominator = 28 - float(distance) * math.cos(math.radians(angle))
-    return int( math.degrees( math.atan( numerator / denominator ) ) )
+    return round( math.degrees( math.atan( numerator / denominator ) ) , 2)
+
+def calculate_grip_distance(angleCam, angleBase, distance):
+    return round( float(distance) * math.sin(math.radians(angleCam)) / math.sin(math.radians(angleBase)), 2)
+
+k1 = 23.75
+k2 = 21.5
+k3 = 20
+
+def calculate_arm_xy(a):
+    part1 = math.asin( (k1**2 - k2**2 + k3**2 + a**2) / (2 * k1 * math.sqrt(k3**2 + a**2)) )
+    part2 = math.asin( k3 / math.sqrt(k3**2 + a**2) )
+    servo1 = part1 - part2
+    numerator = k1 * math.cos(servo1) - k3
+    denominator = k2
+    servo2 = math.acos(numerator / denominator) - servo1
+    servo1 = int( math.degrees(servo1) )
+    servo2 = int( math.degrees(servo2) )
+    return servo1,servo2
+
 
 class ObjectDetection:
 
@@ -28,7 +46,7 @@ class ObjectDetection:
     error_sum_y = 0.0  # Cumulative error
     last_error_y = 0.0  # Last error
 
-    servoCam_pos = 0
+    servoCam_pos = 30
 
     def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
@@ -55,7 +73,7 @@ class ObjectDetection:
         return model
 
     def predict(self, frame, show=False):
-        results = self.model.predict(frame, show)
+        results = self.model.predict(frame, show, verbose=False)
         return results[0]
 
     def exit(self):
@@ -72,7 +90,7 @@ class ObjectDetection:
                     string = ser.readline().decode().rstrip()
                     break
             
-            print(string)
+            # print(string)
             segments = string.split(",")
 
             key_value_pairs = {}
@@ -87,7 +105,7 @@ class ObjectDetection:
         except:
             print("Err<< :", dataStr)
 
-    def __call__(self):
+    def gripper_run(self):
         while True:
             start_time = time()
             rect, frame = self.cap.read()
@@ -147,13 +165,7 @@ class ObjectDetection:
                 # print(-int(finalErr))
 
                 if (finalErr_x < 0.3):
-                    response = self.SendData(f"distance:0, #:#\n")
-                    distance = response['Distance']
-                    angle = int(180-((134-self.servoCam_pos)*17/18))
-                    servoBase_pos = 85 - calculate_angle_base(angle, distance)
-                    if servoBase_pos < 2: servoBase_pos = 2
-                    response = self.SendData(f"servo_base:{servoBase_pos}, #:#\n")
-                    print(response)
+                    return finalErr_x
 
                 self.last_error_x = errorX
                 self.last_error_y = errorY
@@ -169,8 +181,28 @@ class ObjectDetection:
                 try: ser.close()
                 except: pass
                 break
- 
-        exit()
+
     
 detector = ObjectDetection(videoCapture = 0, windowResolution = 480)
-detector()
+
+final_x_err = detector.gripper_run()
+detector.exit()
+
+response = detector.SendData(f"distance:0, #:#\n")
+distance = response['Distance']
+
+angleCam = int(180-((134-detector.servoCam_pos)*17/18))
+angleBase = calculate_angle_base(angleCam, distance)
+print("AngleCam : ", angleCam, " | Distance : ", distance)
+
+servoBase_pos = 85 - angleBase
+if servoBase_pos < 5: servoBase_pos = 5
+response = detector.SendData(f"servo_base:{servoBase_pos}, #:#\n")
+print(response)
+
+gripDistance = calculate_grip_distance(angleCam, angleBase, distance)
+print("Grip Distance", gripDistance)
+
+servo1, servo2 = calculate_arm_xy(gripDistance)
+response = detector.SendData(f"servo_1:{servo1+20},servo_2:{servo2+30}, #:#\n")
+print(response)

@@ -10,7 +10,7 @@ bool newCommand = false;
 
 Servo servo_base, servo_1, servo_2, servo_grip, servo_cam;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2, servoPos_cam;
-int servoPos_Base_temp=0, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0, servoPos_cam_temp=0;
+int servoPos_Base_temp=100, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0, servoPos_cam_temp=0;
 
 const int TRIGGER_PIN = 25;
 const int ECHO_PIN = 23;
