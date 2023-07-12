@@ -74,7 +74,7 @@ class Example(QtWidgets.QMainWindow):
         # else:
         command = ""
         if tmp_s1 != s1:
-            command = f"servo_cam:{180-tmp_s1*2}, #:#\n"
+            command = f"servo_cam:{tmp_s1*2}, #:#\n"
             s1 = tmp_s1
         if tmp_s2 != s2:
             command = f"servo_base:{tmp_s2}, #:#\n"

@@ -5,16 +5,22 @@ import random
 from time import time
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import serial
+import math
 
 try: ser = serial.Serial('COM10', 115200)
 except: print("No serial")
 
 
+def calculate_angle_base(angle, distance):
+    numerator = float(distance) * math.sin(math.radians(angle))
+    denominator = 28 - float(distance) * math.cos(math.radians(angle))
+    return int( math.degrees( math.atan( numerator / denominator ) ) )
+
 class ObjectDetection:
 
     kp = [0.02, 0.02]  # Proportional gain
     ki = [0.0, 0.0]  # Integral gain
-    kd = [0.00001, 0.0]  # Derivative gain
+    kd = [0.0, 0.0]  # Derivative gain
 
     last_time = 0  # Last time update occurred
     error_sum_x = 0.0  # Cumulative error
@@ -22,7 +28,7 @@ class ObjectDetection:
     error_sum_y = 0.0  # Cumulative error
     last_error_y = 0.0  # Last error
 
-    servoCam_pos = 180
+    servoCam_pos = 0
 
     def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
@@ -59,11 +65,25 @@ class ObjectDetection:
     def SendData(self, dataStr):
         try:
             ser.write(dataStr.encode())
+
+            string = ""
             while True:
                 if ser.in_waiting > 0:
-                    data = ser.readline().decode().rstrip()
-                    print(data)
+                    string = ser.readline().decode().rstrip()
                     break
+            
+            print(string)
+            segments = string.split(",")
+
+            key_value_pairs = {}
+            for segment in segments:
+                colon_index = segment.find(":")
+                if colon_index != -1:
+                    key = segment[:colon_index].strip()
+                    value = segment[colon_index+1:].strip()
+                    key_value_pairs[key] = value
+
+            return key_value_pairs
         except:
             print("Err<< :", dataStr)
 
@@ -125,6 +145,15 @@ class ObjectDetection:
                 
                 self.SendData(f"servo_cam:{self.servoCam_pos}, #:#\n")
                 # print(-int(finalErr))
+
+                if (finalErr_x < 0.3):
+                    response = self.SendData(f"distance:0, #:#\n")
+                    distance = response['Distance']
+                    angle = int(180-((134-self.servoCam_pos)*17/18))
+                    servoBase_pos = 85 - calculate_angle_base(angle, distance)
+                    if servoBase_pos < 2: servoBase_pos = 2
+                    response = self.SendData(f"servo_base:{servoBase_pos}, #:#\n")
+                    print(response)
 
                 self.last_error_x = errorX
                 self.last_error_y = errorY

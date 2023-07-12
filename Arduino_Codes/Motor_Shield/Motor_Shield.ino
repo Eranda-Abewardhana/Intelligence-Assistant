@@ -220,7 +220,7 @@ void loop() {
       else if(paramName == "servo_base" && paramValue != "" && servoRelax!=1){
         response += "servo_base : " + String(intValue) + ", ";
         servoPos_Base_temp = intValue;
-        servo_base.write(intValue);
+        // servo_base.write(intValue);
       }
       else if(paramName == "servo_grip" && paramValue != "" && servoRelax!=1){
         response += "servo_grip : " + String(intValue) + ", ";
@@ -251,7 +251,7 @@ void loop() {
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
     
-    Serial.println(">> "+ response);
+    Serial.println(response);
     response = "";
     newCommand = false;
   }
@@ -268,6 +268,19 @@ void loop() {
   //   servo_base.write(servoPos_Base);
   //   delay(20);
   // }
+
+  if(servoPos_Base < servoPos_Base_temp){
+    for (int pos = servoPos_Base; pos <= servoPos_Base_temp; pos += 1) {
+      servo_base.write(pos);
+      delay(20);
+    }
+  }else if(servoPos_Base > servoPos_Base_temp){
+    for (int pos = servoPos_Base; pos >= servoPos_Base_temp; pos -= 1) {
+      servo_base.write(pos);
+      delay(20);
+    }
+  }
+  servoPos_Base = servoPos_Base_temp;
 
   // if(servoPos_grip < servoPos_grip_temp){
   //   for (int pos = servoPos_grip; pos <= servoPos_grip_temp; pos += 1) {
