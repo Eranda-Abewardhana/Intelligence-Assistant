@@ -5,7 +5,7 @@ ser = serial.Serial('COM10', 115200)  # Replace '/dev/ttyUSB0' with the appropri
 
 time.sleep(2)
 
-command = "servo_cam:180,distance:5, #:#\n"
+command = "distance:0, #:#\n"
 ser.write(command.encode())
 
 while True:

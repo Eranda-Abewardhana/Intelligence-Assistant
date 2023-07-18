@@ -16,7 +16,7 @@ from ultralytics import YOLO
 
 cap = cv2.VideoCapture(0)
 
-model = YOLO("yolov8n.pt")
+# model = YOLO("yolov8n.pt")
 
 while True:
     ret, frame = cap. read()
@@ -24,7 +24,7 @@ while True:
 
     # results = model.predict(frame, show=True)
     
-    result = model(frame)
+    # result = model(frame)
 
     if(cv2.waitKey(30) == 27):
         break

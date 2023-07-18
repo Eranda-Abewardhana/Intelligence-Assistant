@@ -1,72 +1,57 @@
-// M1-red GRD-black C1-yellow Vcc-blue C2-green M2-white
+#define enA 10 // PWN1
+#define in1 A2 // L F
+#define in2 A3 // L B
 
-#include <util/atomic.h>
-
-#define C1 4 //yellow
-#define C2 5 //green
-#define PWM 11
-#define IN1 A4
-#define IN2 A5
-
-volatile int posi = 0;
+#define enB 11 // PWN2
+#define in3 A4 // R F
+#define in4 A5 // R B
 
 void setup() {
-  Serial.begin(9600);
-
-  pinMode(C1, INPUT);
-  pinMode(C2, INPUT);
-  attachInterrupt(digitalPinToInterrupt(C1), readEncoder, RISING);
-   
-  pinMode(PWM,OUTPUT);
-  pinMode(IN1,OUTPUT);
-  pinMode(IN2,OUTPUT);
+  // Set the motor control pins as outputs
+  pinMode(enA, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(enB, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
+  
+  // Set the initial motor direction
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
 }
 
 void loop() {
-   
-  int pos = 0;
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    pos = posi;
-  }
-
-  setMotor(1, 150, PWM, IN1, IN2);
-  delay(200);
-   Serial.println(pos);
-  setMotor(-1, 150, PWM, IN1, IN2);
-  delay(200);
-  Serial.println(pos);
-  setMotor(0, 150, PWM, IN1, IN2);
-  delay(20);
-   Serial.println(pos);
-}
-
-void setMotor(int dir,int pwmVal,int pwm,int in1,int in2){
-  analogWrite(pwm, pwmVal);
-
-  if(dir==1){
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
-  }
-
-  else if(dir==-1){
-    digitalWrite(in2, HIGH);
-    digitalWrite(in1, LOW);
-  }
-
-  else {
-    digitalWrite(in2, LOW);
-    digitalWrite(in1, LOW);
-  }
-
-}
-
-void readEncoder(){
-  int b = digitalRead(C2);
-  if(b>0){
-    posi++;
-  }
-  else{
-    posi--;
-  }
-
+  // Set the motor speed
+  analogWrite(enA, 255); // Adjust the speed as needed
+  analogWrite(enB, 255); // Adjust the speed as needed
+  
+  // Rotate the motors clockwise
+  digitalWrite(in1, HIGH);
+  digitalWrite(in2, LOW);
+  digitalWrite(in3, HIGH);
+  digitalWrite(in4, LOW);
+  
+  delay(2000); // Rotate for 2 seconds
+  
+  // Stop the motors
+  analogWrite(enA, 0);
+  analogWrite(enB, 0);
+  
+  delay(1000); // Pause for 1 second
+  
+  // Rotate the motors counterclockwise
+  digitalWrite(in1, LOW);
+  digitalWrite(in2, HIGH);
+  digitalWrite(in3, LOW);
+  digitalWrite(in4, HIGH);
+  
+  delay(2000); // Rotate for 2 seconds
+  
+  // Stop the motors
+  analogWrite(enA, 0);
+  analogWrite(enB, 0);
+  
+  delay(1000); // Pause for 1 second
 }

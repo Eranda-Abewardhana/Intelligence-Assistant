@@ -1,7 +1,7 @@
 // M1-red GRD-black C1-yellow Vcc-blue C2-green M2-white
 
-#define C1  18 //yellow
-#define C2  6 //green
+#define C1  19 //yellow
+#define C2  17 //green
 
 int pos = 0;
 

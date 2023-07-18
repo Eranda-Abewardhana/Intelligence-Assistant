@@ -10,10 +10,10 @@ bool newCommand = false;
 
 Servo servo_base, servo_1, servo_2, servo_grip, servo_cam;
 int servoPos_Base, servoPos_grip, servoPos_1, servoPos_2, servoPos_cam;
-int servoPos_Base_temp=100, servoPos_grip_temp=0, servoPos_1_temp=0, servoPos_2_temp=0, servoPos_cam_temp=0;
+int servoPos_Base_temp=0, servoPos_1_temp=0, servoPos_2_temp=0;
 
-const int TRIGGER_PIN = 25;
-const int ECHO_PIN = 23;
+const int TRIGGER_PIN = 23;
+const int ECHO_PIN = 25;
 
 String state;
 
@@ -86,11 +86,15 @@ void setup() {
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
 
-  servoPos_Base = 100;
-  servoPos_1 = 78;
-  servoPos_2 = 26;
-  servoPos_grip = 55;
-  servoPos_cam = 180;
+  servoPos_Base = 25;
+  servoPos_1 = 120;
+  servoPos_2 = 0;
+  servoPos_grip = 0;
+  servoPos_cam = 130;
+  
+  servoPos_1_temp = servoPos_1;
+  servoPos_2_temp = servoPos_2;
+  servoPos_Base_temp = servoPos_Base;
   
   servo_base.attach(4);
   servo_1.attach(6);
@@ -98,11 +102,11 @@ void setup() {
   servo_grip.attach(5);
   servo_cam.attach(8);
   
-  servo_base.write(servoPos_Base);
-  servo_1.write(servoPos_1);
-  servo_2.write(servoPos_2);
+  servo_base.write(servoPos_Base*74/70);
+  servo_1.write(servoPos_1*32/45);
+  servo_2.write(servoPos_2*32/45);
   servo_grip.write(servoPos_grip);
-  servo_cam.write(servoPos_cam);
+  servo_cam.write(servoPos_cam*180/168);
 }
 
 void loop() {
@@ -218,35 +222,34 @@ void loop() {
           servo_grip.write(0);
       }
       else if(paramName == "servo_base" && paramValue != "" && servoRelax!=1){
-        response += "servo_base : " + String(intValue) + ", ";
-        servoPos_Base_temp = intValue;
-        // servo_base.write(intValue);
+        int servoVal = constrain(intValue, 20, 160);
+        servoPos_Base_temp = int(servoVal*74/70);
+        response += "servo_base : " + String(servoVal) + ", ";
       }
       else if(paramName == "servo_grip" && paramValue != "" && servoRelax!=1){
-        response += "servo_grip : " + String(intValue) + ", ";
-        servoPos_grip_temp = intValue;
-        servo_grip.write(intValue);
+        int servoVal = constrain(intValue, 0, 60);
+        servo_grip.write(servoVal);
+        response += "servo_grip : " + String(servoVal) + ", ";
       }
       else if(paramName == "servo_1" && paramValue != "" && servoRelax!=1){
-        response += "servo_1 : " + String(intValue) + ", ";
-        servoPos_1_temp = intValue;
-        servo_1.write(int(intValue*2/3));
+        int servoVal = constrain(intValue, 0, 120);
+        servoPos_1_temp = int((servoVal+10)*2/3);
+        response += "servo_1 : " + String(servoVal) + ", ";
       }
       else if(paramName == "servo_2" && paramValue != "" && servoRelax!=1){
-        response += "servo_2 : " + String(intValue) + ", ";
-        servoPos_2_temp = intValue;
-        servo_2.write(int(intValue*2/3));
+        int servoVal = constrain(intValue, 0, 145);
+        servoPos_2_temp = int(servoVal*32/45);
+        response += "servo_2 : " + String(servoVal) + ", ";
       }
       else if(paramName == "servo_cam" && paramValue != "" && servoRelax!=1){
-        response += "servo_cam : " + String(intValue) + ", ";
-        servoPos_cam_temp = intValue;
-        servo_cam.write(intValue);
+        int servoVal = constrain(intValue, 0, 168);
+        servo_cam.write(servoVal*180/168);
+        response += "servo_cam : " + String(servoVal) + ", ";
       }
       else if(paramName == "distance" && paramValue != "" && servoRelax!=1){
         unsigned int distance = sonar.ping_cm();
         response += "Distance : " + String(distance) + ", ";
       }
-
 
       receivedString = receivedString.substring(delimiterIndex + 1);
     }
@@ -256,58 +259,26 @@ void loop() {
     newCommand = false;
   }
 
-  // while(servoPos_Base_temp > 0){
-  //   servoPos_Base += 1;
-  //   servoPos_Base_temp -= 1;
-  //   servo_base.write(servoPos_Base);
-  //   delay(20);
-  // }
-  // while(servoPos_Base_temp < 0){
-  //   servoPos_Base -= 1;
-  //   servoPos_Base_temp += 1;
-  //   servo_base.write(servoPos_Base);
-  //   delay(20);
-  // }
-
   if(servoPos_Base < servoPos_Base_temp){
-    for (int pos = servoPos_Base; pos <= servoPos_Base_temp; pos += 1) {
-      servo_base.write(pos);
-      delay(20);
-    }
+    servoPos_Base+=1;
+    servo_base.write(servoPos_Base);
+    delay(20);
   }else if(servoPos_Base > servoPos_Base_temp){
-    for (int pos = servoPos_Base; pos >= servoPos_Base_temp; pos -= 1) {
-      servo_base.write(pos);
-      delay(20);
-    }
+    servoPos_Base-=1;
+    servo_base.write(servoPos_Base);
+    delay(20);
   }
-  servoPos_Base = servoPos_Base_temp;
-
-  // if(servoPos_grip < servoPos_grip_temp){
-  //   for (int pos = servoPos_grip; pos <= servoPos_grip_temp; pos += 1) {
-  //     servo_grip.write(pos);
-  //     delay(20);
-  //   }
-  // }else if(servoPos_grip > servoPos_grip_temp){
-  //   for (int pos = servoPos_grip; pos >= servoPos_grip_temp; pos -= 1) {
-  //     servo_grip.write(pos);
-  //     delay(20);
-  //   }
-  // }
-  // servoPos_grip = servoPos_grip_temp;
-
-  // while(servoPos_1_temp > 0){
-  //   servoPos_1 += 1;
-  //   servoPos_1_temp -= 1;
-  //   servo_1.write(servoPos_1);
-  //   delay(25);
-  // }
-  // while(servoPos_1_temp < 0){
-  //   servoPos_1 -= 1;
-  //   servoPos_1_temp += 1;
-  //   servo_1.write(servoPos_1);
-  //   delay(25);
-  // }
   
+  if(servoPos_1 < servoPos_1_temp){
+    servoPos_1+=1;
+    servo_1.write(servoPos_1);
+    delay(20);
+  }else if(servoPos_1 > servoPos_1_temp){
+    servoPos_1-=1;
+    servo_1.write(servoPos_1);
+    delay(20);
+  }
+
   // while(servoPos_2_temp > 0){
   //   servoPos_2 += 1;
   //   servoPos_2_temp -= 1;
@@ -320,6 +291,16 @@ void loop() {
   //   servo_2.write(servoPos_2);
   //   // delay(25);
   // }
+  
+  if(servoPos_2 < servoPos_2_temp){
+    servoPos_2+=1;
+    servo_2.write(servoPos_2);
+    delay(20);
+  }else if(servoPos_2 > servoPos_2_temp){
+    servoPos_2-=1;
+    servo_2.write(servoPos_2);
+    delay(20);
+  }
 
   // time difference
   long currT = micros();

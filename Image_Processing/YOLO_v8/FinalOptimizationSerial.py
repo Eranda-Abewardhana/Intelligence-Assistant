@@ -2,7 +2,7 @@ from torch import cuda
 import cv2
 from ultralytics import YOLO
 import random
-from time import time
+from time import time,sleep
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import serial
 import math
@@ -12,27 +12,25 @@ except: print("No serial")
 
 def calculate_angle_base(angle, distance):
     numerator = float(distance) * math.sin(math.radians(angle))
-    denominator = 28 - float(distance) * math.cos(math.radians(angle))
+    denominator = 29 - float(distance) * math.cos(math.radians(angle))
     return round( math.degrees( math.atan( numerator / denominator ) ) , 2)
 
 def calculate_grip_distance(angleCam, angleBase, distance):
     return round( float(distance) * math.sin(math.radians(angleCam)) / math.sin(math.radians(angleBase)), 2)
 
-k1 = 23.75
-k2 = 21.5
-k3 = 20
+def calculate_xy(x):
+    l1 = 23.75
+    l2 = 21.5
+    # x = 20
+    y = 3
 
-def calculate_arm_xy(a):
-    part1 = math.asin( (k1**2 - k2**2 + k3**2 + a**2) / (2 * k1 * math.sqrt(k3**2 + a**2)) )
-    part2 = math.asin( k3 / math.sqrt(k3**2 + a**2) )
-    servo1 = part1 - part2
-    numerator = k1 * math.cos(servo1) - k3
-    denominator = k2
-    servo2 = math.acos(numerator / denominator) - servo1
-    servo1 = int( math.degrees(servo1) )
-    servo2 = int( math.degrees(servo2) )
-    return servo1,servo2
+    r = math.sqrt(x**2 + y**2)
+    ang = math.atan2(y, x)
 
+    y1 = math.acos((l1**2+l2**2-r**2)/(2*l1*l2))
+    x1 = ang+math.asin(l2*math.sin(y1)/r)
+
+    return int(math.degrees(x1)),int(math.degrees(y1))
 
 class ObjectDetection:
 
@@ -46,7 +44,7 @@ class ObjectDetection:
     error_sum_y = 0.0  # Cumulative error
     last_error_y = 0.0  # Last error
 
-    servoCam_pos = 30
+    servoCam_pos = 10
 
     def __init__(self, videoCapture=1, windowResolution=480):
         self.capture_index = videoCapture
@@ -115,7 +113,7 @@ class ObjectDetection:
             detections = []
             for r in results.boxes.data.tolist():
                 x1, y1, x2, y2, score, class_id = r
-                if(class_id == 39):
+                if(class_id == 0):
                     x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
                     detections.append([[x1, y1, x2, y2], score, class_id])
 
@@ -161,11 +159,11 @@ class ObjectDetection:
                 if self.servoCam_pos < 0: self.servoCam_pos = 0
                 if self.servoCam_pos > 180: self.servoCam_pos = 180
                 
-                self.SendData(f"servo_cam:{self.servoCam_pos}, #:#\n")
-                # print(-int(finalErr))
+                # self.SendData(f"servo_cam:{self.servoCam_pos}, #:#\n")
 
-                if (finalErr_x < 0.3):
-                    return finalErr_x
+                if (-0.3 < finalErr_x < 0.3):
+                    # return finalErr_x
+                    print(finalErr_x)
 
                 self.last_error_x = errorX
                 self.last_error_y = errorY
@@ -182,27 +180,33 @@ class ObjectDetection:
                 except: pass
                 break
 
+while True:
+    detector = ObjectDetection(videoCapture = 1, windowResolution = 480)
+
+    final_x_err = detector.gripper_run()
+    detector.exit()
+
+    response = detector.SendData(f"distance:0, #:#\n")
+    distance = response['Distance']
+
+    angleCam = int(50 + detector.servoCam_pos)
+    angleBase = calculate_angle_base(angleCam, distance)
+    print("AngleCam : ", angleCam, " | Distance : ", distance)
+
+    servoBase_pos = 85 - angleBase
+    if servoBase_pos < 5: servoBase_pos = 5
+    response = detector.SendData(f"servo_base:{servoBase_pos}, #:#\n")
+    print(response)
+
+    gripDistance = calculate_grip_distance(angleCam, angleBase, distance)
+    print("Grip Distance", gripDistance)
+
+    servo1, servo2 = calculate_xy(gripDistance)
+    response = detector.SendData(f"servo_1:{servo1},servo_2:{servo2}, #:#\n")
+    print(response)
+
+    response = detector.SendData(f"servo_grip:20, #:#\n")
+    print(response)
     
-detector = ObjectDetection(videoCapture = 0, windowResolution = 480)
-
-final_x_err = detector.gripper_run()
-detector.exit()
-
-response = detector.SendData(f"distance:0, #:#\n")
-distance = response['Distance']
-
-angleCam = int(180-((134-detector.servoCam_pos)*17/18))
-angleBase = calculate_angle_base(angleCam, distance)
-print("AngleCam : ", angleCam, " | Distance : ", distance)
-
-servoBase_pos = 85 - angleBase
-if servoBase_pos < 5: servoBase_pos = 5
-response = detector.SendData(f"servo_base:{servoBase_pos}, #:#\n")
-print(response)
-
-gripDistance = calculate_grip_distance(angleCam, angleBase, distance)
-print("Grip Distance", gripDistance)
-
-servo1, servo2 = calculate_arm_xy(gripDistance)
-response = detector.SendData(f"servo_1:{servo1+20},servo_2:{servo2+30}, #:#\n")
-print(response)
+    response = detector.SendData(f"servo_1:90,servo_2:90, #:#\n")
+    print(response)
