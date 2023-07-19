@@ -171,21 +171,15 @@ class MainWindow(QMainWindow):
 
 
     def flow(self):
+        global servo_cam, object_distance, servo_1, servo_2, servo_base
+
         thread = threading.Thread(target = self.getGripPos)
         thread.start()
         thread.join()
-
-        thread2 = threading.Thread(target = self.grip)
-        thread2.start()
-        thread2.join()
         
-
-    def grip(self):
-        global servo_cam, object_distance, servo_1, servo_2, servo_base
         try:
             grip_distance, servo_base = calculate_baseAngle(servo_cam, object_distance)
             for angle in range(90, servo_base, -1):
-                self.slider2.setValue(angle)
                 self.SendData(f"servo_base:{angle}, #:#\n")
                 sleep(0.05)
 
@@ -194,9 +188,7 @@ class MainWindow(QMainWindow):
                 self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
                 sleep(0.05)
 
-            servo_grip = 20
-            self.SendData(f"servo_grip:{servo_grip}, #:#\n")
-            self.slider3.setValue(servo_grip)
+            self.SendData(f"servo_grip:20, #:#\n")
             sleep(0.5)
 
             for distance in range(grip_distance, 5, -1):
@@ -206,7 +198,6 @@ class MainWindow(QMainWindow):
                 sleep(0.05)
 
             for angle in range(servo_base, 90):
-                self.slider2.setValue(angle)
                 self.SendData(f"servo_base:{angle}, #:#\n")
                 sleep(0.05)
 
@@ -447,6 +438,7 @@ class MainWindow(QMainWindow):
                 pixmap = QPixmap.fromImage(q_image)
                 scaled_pixmap = pixmap.scaled(640, 480, Qt.KeepAspectRatio) # type: ignore
                 self.image_label.setPixmap(scaled_pixmap)
+                # self.update_plot()
 
                 end_time = time()
                 fps = round(1/(end_time - start_time), 2)

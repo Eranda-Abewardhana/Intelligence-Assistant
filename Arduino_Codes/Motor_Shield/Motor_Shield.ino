@@ -39,9 +39,9 @@ float eintegral[] = {0,0};
 int m1pos=0;
 int m2pos=0;
 
-float kp[] = {3, 3};
-float kd[] = {0.45, 0.45};
-float ki[] = {0.001, 0.001};
+float kp[] = {30, 30};
+float kd[] = {2, 2};
+float ki[] = {0, 0};
 
 String response = "";
 
@@ -272,11 +272,11 @@ void loop() {
   if(servoPos_1 < servoPos_1_temp){
     servoPos_1+=1;
     servo_1.write(servoPos_1);
-    delay(20);
+    delay(10);
   }else if(servoPos_1 > servoPos_1_temp){
     servoPos_1-=1;
     servo_1.write(servoPos_1);
-    delay(20);
+    delay(10);
   }
 
   // while(servoPos_2_temp > 0){
@@ -295,11 +295,11 @@ void loop() {
   if(servoPos_2 < servoPos_2_temp){
     servoPos_2+=1;
     servo_2.write(servoPos_2);
-    delay(20);
+    delay(10);
   }else if(servoPos_2 > servoPos_2_temp){
     servoPos_2-=1;
     servo_2.write(servoPos_2);
-    delay(20);
+    delay(10);
   }
 
   // time difference
