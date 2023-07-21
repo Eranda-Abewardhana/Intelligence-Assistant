@@ -90,7 +90,7 @@ void setup() {
   servoPos_1 = 120;
   servoPos_2 = 0;
   servoPos_grip = 0;
-  servoPos_cam = 130;
+  servoPos_cam = 0;
   
   servoPos_1_temp = servoPos_1;
   servoPos_2_temp = servoPos_2;
