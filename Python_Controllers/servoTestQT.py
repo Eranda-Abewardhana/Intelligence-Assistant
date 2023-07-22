@@ -1,7 +1,7 @@
 import math
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSlider, QLabel, QHBoxLayout
-from PyQt5.QtCore import QRect, Qt, QTimer
+from PyQt5.QtCore import QRect, Qt, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -23,6 +23,12 @@ targetDoneCount = 0
 
 getGripPos = False
 gripObject = False
+conformObject = False
+UpdatePlot = True
+reachObject = False
+SearchingObject = False
+
+vehicle_angle = 0
 
 servo_cam, servo_base, servo_grip, servo_1, servo_2 = 30,90,0,120,0
 
@@ -37,9 +43,9 @@ def calculate_arm_angles(x, y):
     return int(math.degrees(x1)),int(math.degrees(y1))
 
 def calculate_baseAngle(angle_cam, object_distance):
-    grip_distance = math.sqrt( object_distance**2 + distance_arm_cam**2 - 2*distance_arm_cam*object_distance*math.cos(math.radians(angle_cam+50)) )
-    grip_angle = math.degrees( math.asin( object_distance*math.sin(math.radians(angle_cam+50)) / grip_distance ) )
-    return int(grip_distance), int(grip_angle)
+    grip_distance = math.sqrt( object_distance**2 + distance_arm_cam**2 - 2*distance_arm_cam*object_distance*math.cos(math.radians(angle_cam+42)) )
+    grip_angle = math.degrees( math.asin( object_distance*math.sin(math.radians(angle_cam+42)) / grip_distance ) )
+    return int(grip_distance)+2, 90-int(grip_angle)-3
 
 
 try: ser = serial.Serial('/dev/ttyACM0', 115200)  # Replace '/dev/ttyACM0' with the appropriate port
@@ -48,36 +54,60 @@ except: print("No Serial")
 sleep(1)
 
 
-# # Load the TFLite model
-# interpreter = tf.lite.Interpreter("Image_Processing/TF_Lite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/detect.tflite")
-# interpreter.allocate_tensors()
-# input_details = interpreter.get_input_details()
-# output_details = interpreter.get_output_details()
+# Load the TFLite model
+interpreter = tf.lite.Interpreter("Image_Processing/TF_Lite/coco_ssd_mobilenet_v1_1.0_quant_2018_06_29/detect.tflite")
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+
+class WorkerThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        while True:
+            if not getGripPos:
+                self.parent.getGripPos()
+                continue
+            
+            if not gripObject:
+                self.parent.gripObject()
+                break
+        
+        print("finished")
+
+        self.finished.emit()
 
 
 class MainWindow(QMainWindow):
-    kp = [0.02, 0.02]  # Proportional gain
+    kp = [0.01, 1]  # Proportional gain
 
 
     def __init__(self):
         super().__init__()
         global gripperLoc_x, gripperLoc_y, servo_cam, servo_base, servo_grip, servo_1, servo_2
 
-        self.device = 'cuda' if cuda.is_available() else 'cpu'
-        print("Using Device: ", self.device)
-        self.model = YOLO("yolov8n.pt")
-        self.model.fuse()
-        self.tracker = DeepSort(max_age=5)
-        self.CLASS_NAMES_DICT = self.model.names
+        # self.device = 'cuda' if cuda.is_available() else 'cpu'
+        # print("Using Device: ", self.device)
+        # self.model = YOLO("yolov8n.pt")
+        # self.model.fuse()
+        # self.tracker = DeepSort(max_age=5)
+        # self.CLASS_NAMES_DICT = self.model.names
 
         self.colors = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for j in range(10)]
 
         self.SendData(f"servo_cam:{servo_cam}, #:#\n")
 
-        self.resize(1200, 600)
+        self.resize(1300, 800)
 
         self.image_label = QLabel(self)
-        self.video_stream = cv2.VideoCapture(1)
+        self.video_stream = cv2.VideoCapture(0)
+        self.video_stream.set(3,640)
+        self.video_stream.set(4,360)
         assert self.video_stream.isOpened()
         print("running")
 
@@ -166,24 +196,137 @@ class MainWindow(QMainWindow):
         self.slider4.valueChanged.connect(self.sliderChanged)
         self.slider5.valueChanged.connect(self.sliderChanged)
 
+        # self.thread = WorkerThread(parent=self)
+        # # self.thread.finished.connect(self.task_completed)
+        # self.thread.start()
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.flow) # type: ignore
         self.timer.start(1)  # (30 FPS)
 
 
     def flow(self):
-        if not getGripPos:
-            self.getGripPos()
+        global gripObject, SearchingObject
+
+        if not SearchingObject:
+            self.SearchingObject()
             return
         
-        if not gripObject:
-            self.gripObject()
-            return
+        # if not gripObject:
+        #     self.gripObject()
+        #     return
         
-        print("<<<<<<<<<< done >>>>>>>>>>>>")
+    def SearchingObject(self):
+        if not ObjectDetected:
+
+    def reachObject(self):
+        global object_distance, servo_cam, reachObject
+        ret, frame = self.video_stream.read()
+        if ret:
+            print("Going to Position.............")
+            start_time = time()
+
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            input_shape = input_details[0]['shape']
+            frame_resized = cv2.resize(frame_rgb, (input_shape[2], input_shape[1]))
+            input_data = np.expand_dims(frame_resized, axis=0)
+
+            interpreter.set_tensor(input_details[0]['index'],input_data)
+            interpreter.invoke()
+
+            boxes = interpreter.get_tensor(output_details[0]['index'])[0] # Bounding box coordinates of detected objects
+            classes = interpreter.get_tensor(output_details[1]['index'])[0] # Class index of detected objects
+            scores = interpreter.get_tensor(output_details[2]['index'])[0] # Confidence of detected objects
+
+            # print(scores)
+            # print(classes)
+
+            # detections = []
+            for i in range(len(scores)):
+                # continue
+                class_id = int(classes[i])
+                if (int(class_id)==43 and scores[i] > 0.6):
+                    # int(class_id)==0 and
+                    ymin = int(max(1,(boxes[i][0] * 360)))
+                    xmin = int(max(1,(boxes[i][1] * 640)))
+                    ymax = int(min(360,(boxes[i][2] * 360)))
+                    xmax = int(min(640,(boxes[i][3] * 640)))
+
+                    color = self.colors[class_id % len(self.colors)]
+                    # cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (color), 3)
+                    # cv2.putText(frame,f'ID : {class_id}',(xmin,ymin),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+
+                    left, top, right, bottom = xmin, ymin, xmax, ymax
+                    # detections.append([[xmin, ymin, xmax, ymax], scores[i], int(classes[i])])
+
+                    obj_mid = [int((left+right)/2),int((top+bottom)/2)]
+
+                    frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
+                    frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
+
+                    errorX = (obj_mid[0] - frame_width_mid)
+                    errorY = (frame_height_mid - obj_mid[1])
+                                    
+                    # print("Change X : ", errorX, " | Change Y : ", errorY)
+                    cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
+                    cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
+                    cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
+
+                    cv2.rectangle(frame, (left, top), (right, bottom), (color), 3)
+                    # cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
+                    cv2.putText(frame,f'ID : {class_id}',(left,top),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+
+                    finalErr_x = self.kp[0] * errorX
+                    finalErr_y = self.kp[1] * errorY
+
+                    servo_cam_ = servo_cam - round(finalErr_x)
+                    if servo_cam_ < 0: servo_cam_ = 0
+                    if servo_cam_ > 180: servo_cam_ = 180
+                    
+                    self.slider1.setValue(servo_cam_)
+
+                    if (-0.4 < finalErr_x < -0.2 or 0.2 < finalErr_x < 0.4):
+                        self.SendData(f"m1_pos:1, #:#\n")
+                        print(finalErr_x)
+                        sleep(0.05)
+
+                    if (-0.2 < finalErr_x < 0.2):
+                        targetDoneCount +=1
+
+                    if( targetDoneCount > 10 ):
+                        while True:
+                            Distance = []
+                            for _ in range(11):
+                                response = self.SendData(f"distance:0, #:#\n", 0)
+                                if response['Distance']:
+                                    Distance.append(int(response['Distance']))
+                                sleep(0.03)
+                            object_distance = int(np.percentile(Distance, 50))
+                            print(object_distance)
+                            if object_distance > 35:
+                                self.SendData(f"m1_pos:2, #:#\n", 0)
+                            else:
+                                break
+
+                        print(">>>>>>>>>>> object_distance : ", object_distance)
+
+                        reachObject = True
+
+            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_image.shape
+            bytes_per_line = ch * w
+            q_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(q_image)
+            scaled_pixmap = pixmap.scaled(640, 360, Qt.KeepAspectRatio) # type: ignore
+            self.image_label.setPixmap(scaled_pixmap)
+
+            end_time = time()
+            fps = round(1/(end_time - start_time), 2)
+            print(f'FPS: {fps}')
 
 
-    def SendData(self, dataStr):
+
+    def SendData(self, dataStr, show=1):
         try:
             ser.write(dataStr.encode())
 
@@ -193,7 +336,8 @@ class MainWindow(QMainWindow):
                     string = ser.readline().decode().rstrip()
                     break
             
-            # print(string)
+            if show==1: print(string)
+
             segments = string.split(",")
 
             key_value_pairs = {}
@@ -210,48 +354,76 @@ class MainWindow(QMainWindow):
 
 
     def gripObject(self):
-        global gripObject, servo_cam, object_distance, servo_1, servo_2, servo_base
+        global gripObject, getGripPos, servo_cam, object_distance, UpdatePlot, conformObject
         try:
-            grip_distance, servo_base = calculate_baseAngle(servo_cam, object_distance)
-            for angle in range(90, servo_base, -1):
-                self.slider2.setValue(angle)
-                sleep(0.05)
+            UpdatePlot = False
+            
+            if not conformObject:
+                self.getGripPos()
+                if not getGripPos: return
 
-            for distance in range(5, grip_distance):
-                servo_1, servo_2 = calculate_arm_angles(distance, 5)
-                self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
-                self.update_plot()
-                sleep(0.05)
+                grip_distance, servo_base_tmp = calculate_baseAngle(servo_cam, object_distance)
+                print(">>>>>>>>>>>>>>>>",grip_distance, servo_base_tmp,">>>>>>>>>>>>>>>>>>")
+                # self.slider2.setValue(servo_base)
+                # self.slider4.setValue(grip_distance)
+                # return
 
-            servo_grip = 20
-            self.slider3.setValue(servo_grip)
-            sleep(0.5)
+                self.slider2.setValue(servo_base_tmp)
 
-            for distance in range(grip_distance, 5, -1):
-                servo_1, servo_2 = calculate_arm_angles(distance, 5)
-                servo_2 = 180 - servo_1
-                self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
-                self.update_plot()
-                sleep(0.05)
+                sleep(1)
+                servo_grip = 0
+                self.slider3.setValue(servo_grip)
 
-            for angle in range(servo_base, 90):
-                self.slider2.setValue(angle)
-                sleep(0.05)
+                sleep(1)
+                
+                for distance in range(10, grip_distance+1):
+                    self.slider4.setValue(distance)
+                    self.slider5.setValue(int(5-(distance-10)/3))
+                    sleep(0.06)
 
-            gripObject = True
+                sleep(1)
+                servo_grip = 40
+                self.slider3.setValue(servo_grip)
+                sleep(2.5)
+
+                for distance in range(grip_distance, 10, -1):
+                    self.slider4.setValue(distance)
+                    self.slider5.setValue(int(5-(distance-10)/3))
+                    sleep(0.06)
+
+                sleep(1)
+
+                getGripPos = False
+                self.conformObject()
+
+            else:
+                for angle in range(servo_base, 91):
+                    self.slider2.setValue(angle)
+                    sleep(0.04)
+
+                sleep(1)
+                servo_grip = 0
+                self.slider3.setValue(servo_grip)
+
+                gripObject = True
+                UpdatePlot = True
+
+                print("<<<<<<<<<< done >>>>>>>>>>>>")
+                self.image_label.setPixmap(QPixmap())
+                # self.image_label.clear()
         except:
             print("Math err")
 
 
     def update_plot(self):
-        lx1 = arm1_length * math.cos(math.radians(servo_1)) * math.cos(math.radians(servo_base-100))
+        lx1 = arm1_length * math.cos(math.radians(servo_1)) * math.cos(math.radians(servo_base-90))
         lz1 = arm1_length * math.sin(math.radians(servo_1))
-        ly1 = arm1_length * math.cos(math.radians(servo_1)) * math.sin(math.radians(servo_base-100))
+        ly1 = arm1_length * math.cos(math.radians(servo_1)) * math.sin(math.radians(servo_base-90))
 
         realY = math.radians(servo_1) + math.radians(servo_2) - math.pi
-        lx2 = arm2_length * math.cos(realY) * math.cos(math.radians(servo_base-100))
+        lx2 = arm2_length * math.cos(realY) * math.cos(math.radians(servo_base-90))
         lz2 = arm2_length * math.sin(realY)
-        ly2 = arm2_length * math.cos(realY) * math.sin(math.radians(servo_base-100))
+        ly2 = arm2_length * math.cos(realY) * math.sin(math.radians(servo_base-90))
 
         self.ax.clear()
 
@@ -291,8 +463,8 @@ class MainWindow(QMainWindow):
         lx1 = grip_distance*math.cos(math.radians(grip_angle))
         ly1 = grip_distance*math.sin(math.radians(grip_angle))
 
-        lx2 = distance_arm_cam - object_distance*math.cos(math.radians(servo_cam+50))
-        ly2 = object_distance*math.sin(math.radians(servo_cam+50))
+        lx2 = distance_arm_cam - object_distance*math.cos(math.radians(servo_cam+42))
+        ly2 = object_distance*math.sin(math.radians(servo_cam+42))
 
         x = np.array([distance_arm_cam, lx2, 0])
         y = np.array([0, -ly2, 0])
@@ -309,7 +481,7 @@ class MainWindow(QMainWindow):
         # self.ax.set_title('3D Beam Visualization')
 
         self.ax.set_xlim3d(-15, 35)
-        self.ax.set_ylim3d(-25, 15)
+        self.ax.set_ylim3d(-25, 25)
         self.ax.set_zlim3d(0, 50)
 
         self.canvas.draw()
@@ -317,7 +489,7 @@ class MainWindow(QMainWindow):
 
     def sliderChanged(self):
         global servo_cam,servo_base,servo_grip,servo_1,servo_2
-        global gripperLoc_x, gripperLoc_y
+        global gripperLoc_x, gripperLoc_y, UpdatePlot
         
         slider1_value = self.slider1.value()
         slider2_value = self.slider2.value()
@@ -334,85 +506,105 @@ class MainWindow(QMainWindow):
         if slider3_value != servo_grip:
             self.SendData(f"servo_grip:{slider3_value}, #:#\n")
             servo_grip = slider3_value
-        # if slider3_value != servo_grip:
-        #     if servo_grip<slider3_value:
-        #         x_val, y_val = calculate_arm_angles(slider3_value/2)
-        #     else:
-        #         x_val, y_val = calculate_arm_angles(slider3_value/2)
-        #         y_val = 180 - x_val
-        #     # servo_grip = slider3_value
-        #     command = f"servo_1:{x_val},servo_2:{y_val}, {slider3_value}#:#\n"
-        #     servo_grip = slider3_value
-        #     # print(command)
         if slider4_value != gripperLoc_x or slider5_value != gripperLoc_y:
-            gripperLoc_x = slider4_value
-            gripperLoc_y = slider5_value
             print(gripperLoc_x, gripperLoc_y)
-
             try:
-                servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
+                if gripperLoc_x > slider4_value:
+                    servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
+                    servo_2 = 180 - servo_1
+                else:
+                    servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
                 self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
             except:
                 print("Math err")
+            gripperLoc_x = slider4_value
+            gripperLoc_y = slider5_value
 
-        self.update_plot()
+        if UpdatePlot: self.update_plot()
+
+
+    def conformObject(self):
+        global conformObject
+
+        available = []
+        for _ in range(40):
+            ret, frame = self.video_stream.read()
+            if ret:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                input_shape = input_details[0]['shape']
+                frame_resized = cv2.resize(frame_rgb, (input_shape[2], input_shape[1]))
+                input_data = np.expand_dims(frame_resized, axis=0)
+
+                interpreter.set_tensor(input_details[0]['index'],input_data)
+                interpreter.invoke()
+
+                classes = interpreter.get_tensor(output_details[1]['index'])[0] # Class index of detected objects
+                scores = interpreter.get_tensor(output_details[2]['index'])[0] # Confidence of detected objects
+                
+                for i in range(len(classes)):
+                    class_id = int(classes[i])
+                    if class_id==43 and scores[i] > 0.5:
+                        available.append(False)
+
+                available.append(True)
+
+        conformObject = max(available, key=available.count)
 
 
     def getGripPos(self):
         global targetDoneCount, getGripPos, object_distance, servo_cam
         ret, frame = self.video_stream.read()
         if ret:
+            print("gripping.............")
             start_time = time()
             # frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-            # input_shape = input_details[0]['shape']
-            # resized_frame = cv2.resize(frame, (input_shape[2], input_shape[1]))
 
-            # if len(input_shape) == 4:
-            #     resized_frame = np.expand_dims(resized_frame, axis=0)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            input_shape = input_details[0]['shape']
+            frame_resized = cv2.resize(frame_rgb, (input_shape[2], input_shape[1]))
+            input_data = np.expand_dims(frame_resized, axis=0)
 
-            # resized_frame = resized_frame.astype(np.uint8)
+            interpreter.set_tensor(input_details[0]['index'],input_data)
+            interpreter.invoke()
 
-            # interpreter.set_tensor(input_details[0]['index'], resized_frame)
-            # interpreter.invoke()
+            boxes = interpreter.get_tensor(output_details[0]['index'])[0] # Bounding box coordinates of detected objects
+            classes = interpreter.get_tensor(output_details[1]['index'])[0] # Class index of detected objects
+            scores = interpreter.get_tensor(output_details[2]['index'])[0] # Confidence of detected objects
 
-            # output_locations = interpreter.get_tensor(output_details[0]['index'])
-            # output_classes = interpreter.get_tensor(output_details[1]['index'])
-            # output_scores = interpreter.get_tensor(output_details[2]['index'])
-            # num_detections = int(output_details[3]['index'])
+            # print(scores)
+            # print(classes)
 
-            # # print(f"Output locations shape: {output_locations.shape}")
-            # # print(f"Output classes shape: {output_classes.shape}")
-            # # print(f"Output scores shape: {output_scores.shape}")
+            # detections = []
+            for i in range(len(scores)):
+                # continue
+                class_id = int(classes[i])
+                if (int(class_id)==43 and scores[i] > 0.6):
+                    # int(class_id)==0 and
+                    ymin = int(max(1,(boxes[i][0] * 360)))
+                    xmin = int(max(1,(boxes[i][1] * 640)))
+                    ymax = int(min(360,(boxes[i][2] * 360)))
+                    xmax = int(min(640,(boxes[i][3] * 640)))
 
-            # # print(output_classes)
+                    color = self.colors[class_id % len(self.colors)]
+                    # cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (color), 3)
+                    # cv2.putText(frame,f'ID : {class_id}',(xmin,ymin),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
 
-            # for i in range(len(output_classes[0])):
-            #     # print(output_classes[0][i])
-            #     class_id = int(output_classes[0][i])
-            #     score = float(output_scores[0][i])
-            #     if score > 0.5:
-            #         ymin, xmin, ymax, xmax = output_locations[0][i]
-            #         xmin = int(xmin * frame.shape[1])
-            #         xmax = int(xmax * frame.shape[1])
-            #         ymin = int(ymin * frame.shape[0])
-            #         ymax = int(ymax * frame.shape[0])
-            #         color = self.colors[class_id % len(self.colors)]
-
-            #         left, top, right, bottom = xmin, ymin, xmax, ymax
+                    left, top, right, bottom = xmin, ymin, xmax, ymax
+                    # detections.append([[xmin, ymin, xmax, ymax], scores[i], int(classes[i])])
 
             #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-            results = self.model.predict(frame, verbose=False)[0]
+            # results = self.model.predict(frame, verbose=False)[0]
 
-            detections = []
-            for r in results.boxes.data.tolist():
-                x1, y1, x2, y2, score, class_id = r
-                if(class_id == 1):
-                    x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-                    detections.append([[x1, y1, x2, y2], score, class_id])
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0,0,255), 3)
+            # detections = []
+            # for r in results.boxes.data.tolist():
+            #     x1, y1, x2, y2, score, class_id = r
+            #     # if(class_id == 1):
+            #     x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+            #     detections.append([[x1, y1, x2, y2], score, class_id])
+            #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0,0,255), 3)
 
             # tracked = self.tracker.update_tracks(detections, frame=frame)
             
@@ -426,50 +618,66 @@ class MainWindow(QMainWindow):
 
             # #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-            #         obj_mid = [int((left+right)/2),int((top+bottom)/2)]
+                    obj_mid = [int((left+right)/2),int((top+bottom)/2)]
 
-            #         frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
-            #         frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
+                    frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
+                    frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
 
-            #         errorX = (obj_mid[0] - frame_width_mid)
-            #         errorY = (frame_height_mid - obj_mid[1])
+                    errorX = (obj_mid[0] - frame_width_mid)
+                    errorY = (frame_height_mid - obj_mid[1])
                                     
-            #         # print("Change X : ", errorX, " | Change Y : ", errorY)
-            #         cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
-            #         cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
-            #         cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
+                    # print("Change X : ", errorX, " | Change Y : ", errorY)
+                    cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
+                    cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
+                    cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
 
-            #         cv2.rectangle(frame, (left, top), (right, bottom), (color), 3)
-            #         # cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
-            #         cv2.putText(frame,f'ID : {class_id}',(left,top),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+                    cv2.rectangle(frame, (left, top), (right, bottom), (color), 3)
+                    # cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
+                    cv2.putText(frame,f'ID : {class_id}',(left,top),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
 
 
-            #         finalErr_x = self.kp[0] * errorX
-            #         finalErr_y = self.kp[1] * errorY
+                    finalErr_x = self.kp[0] * errorX
+                    finalErr_y = self.kp[1] * errorY
 
-            #         servo_cam -= round(finalErr_x)
-            #         if servo_cam < 0: servo_cam = 0
-            #         if servo_cam > 180: servo_cam = 180
+                    servo_cam_ = servo_cam - round(finalErr_x)
+                    if servo_cam_ < 0: servo_cam_ = 0
+                    if servo_cam_ > 180: servo_cam_ = 180
                     
-            #         response = self.SendData(f"servo_cam:{servo_cam},distance:0, #:#\n")
-            #         if type(response) == 'dict':
-            #             object_distance = response['Distance']
+                    self.slider1.setValue(servo_cam_)
 
-            #         self.slider1.setValue(servo_cam)
-            #         if (-0.3 < finalErr_x < 0.3):
-            #             targetDoneCount +=1
-            #             print(finalErr_x)
+                    if (-0.4 < finalErr_x < -0.2 or 0.2 < finalErr_x < 0.4):
+                        self.SendData(f"m1_pos:1, #:#\n")
+                        print(finalErr_x)
+                        sleep(0.05)
 
-            #         if( targetDoneCount > 5 ):
-            #             getGripPos = True
+                    if (-0.2 < finalErr_x < 0.2):
+                        targetDoneCount +=1
 
+                    if( targetDoneCount > 10 ):
+                        while True:
+                            Distance = []
+                            for _ in range(11):
+                                response = self.SendData(f"distance:0, #:#\n", 0)
+                                if response['Distance']:
+                                    Distance.append(int(response['Distance']))
+                                sleep(0.03)
+                            object_distance = int(np.percentile(Distance, 50))
+                            print(object_distance)
+                            if object_distance > 35:
+                                self.SendData(f"m1_pos:2, #:#\n", 0)
+                            else:
+                                break
+
+                        print(">>>>>>>>>>> object_distance : ", object_distance)
+
+                        getGripPos = True
 
             rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb_image.shape
             bytes_per_line = ch * w
             q_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(q_image)
-            scaled_pixmap = pixmap.scaled(640, 480, Qt.KeepAspectRatio) # type: ignore
+            scaled_pixmap = pixmap.scaled(640, 360, Qt.KeepAspectRatio) # type: ignore
             self.image_label.setPixmap(scaled_pixmap)
 
             end_time = time()
@@ -479,7 +687,6 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.video_stream.release()
-        self.timer.stop()
         self.SendData("m_stop:1, #:#\n")
         event.accept()
         try: ser.close()
