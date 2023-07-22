@@ -48,6 +48,7 @@ String response = "";
 int initSpeed = 0;
 
 int stopVal = 0;
+int bluetooth = 0;
 int servoRelax = 0;
 
 void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
@@ -111,43 +112,6 @@ void setup() {
 
 void loop() {
 
-  //    while (Serial3.available()){
-  //       delay(10);
-  //       char c = Serial3.read();
-  //       state += c;
-  //     }
-
-  // if (state.length() > 0) 
-  // {
-  //   Serial.println(state);
-
-  //   // Check if the word "bottle" is present in the received string
-  //   if (state.indexOf("bottle") != -1) {
-  //     Serial.println("bottle");
-  //     // Execute your code here if "bottle" is found
-  //   }
-    
-  //   else if (state.indexOf("watch") != -1) {
-  //     Serial.println("watch");
-  //     // Execute your code here if "watch" is found
-  //   } 
-
-  //   else if (state.indexOf("medicine") != -1) {
-  //     Serial.println("medicine");
-  //     // Execute your code here if "medicine" is found
-  //   } 
-
-  //   else if (state.indexOf("lipstick") != -1) {
-  //     Serial.println("lipstick");
-  //     // Execute your code here if "lipstick" is found
-  //   } 
-
-  //    //else { }
-  
-
-  //   state = "";
-  // }
-
 
   while (Serial.available()) {
     char c = Serial.read();
@@ -197,6 +161,10 @@ void loop() {
       }
       else if(paramName == "my_err"){
         ;
+      }
+      else if(paramName == "bluetooth"){
+        bluetooth = intValue;
+        bluetooth();
       }
       else if(paramName == "servo_relax"){
         servoRelax = intValue;
@@ -369,7 +337,47 @@ void X_errFunction(int error){
       Serial.println(response);
       response = "";
 }
+void bluetooth(){
+      while (Serial3.available()){
+        if(bluetooth == 0){
+          break;
+        }
+        delay(10);
+        char c = Serial3.read();
+        state += c;
+      }
 
+  if (state.length() > 0) 
+  {
+    Serial.println(state);
+
+    // Check if the word "bottle" is present in the received string
+    if (state.indexOf("bottle") != -1) {
+      responce = "bluetooth : bottle"
+            // Execute your code here if "bottle" is found
+    }
+    
+    else if (state.indexOf("watch") != -1) {
+      responce = "bluetooth : watch"
+      // Execute your code here if "watch" is found
+    } 
+
+    else if (state.indexOf("medicine") != -1) {
+      responce = "bluetooth : medicine"
+      // Execute your code here if "medicine" is found
+    } 
+
+    else if (state.indexOf("lipstick") != -1) {
+      responce = "bluetooth : lipstick"
+      // Execute your code here if "lipstick" is found
+    } 
+
+    state = "";
+  }
+
+      Serial.println(response);
+      response = "";
+}
 void motorControl(char pos, char dir, int speed){
   speed = constrain(speed, 0, 255);
   response += "  | " + String(pos) + " " + String(dir) + " : " + String(speed);
