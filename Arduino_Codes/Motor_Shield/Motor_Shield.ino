@@ -19,6 +19,8 @@ String state;
 
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, 200);
 
+#define buzzerLed 13 // YELLOW
+
 #define C1 18 // YELLOW
 #define C2 16 // GREEN
 #define enA 11 //PWN1
@@ -48,7 +50,9 @@ String response = "";
 int initSpeed = 0;
 
 int stopVal = 0;
+int bluetooth = 0;
 int servoRelax = 0;
+int  buzzer = 0;
 
 void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
   analogWrite(pwm,pwmVal);
@@ -69,7 +73,7 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
 void setup() {
   Serial3.begin(9600); // Bluetooth serial communication will happen on pins 2 and 3
   Serial.begin(115200); // Serial communication to check the data on the Serial Monitor
-  pinMode(13, OUTPUT); // LED connected to pin 13
+  pinMode(buzzerLed, OUTPUT); // LED connected to pin 13
 
   pinMode(C1,INPUT);
   pinMode(C2,INPUT);
@@ -91,7 +95,7 @@ void setup() {
   servoPos_2 = 0;
   servoPos_grip = 0;
   servoPos_cam = 0;
-  
+   
   servoPos_1_temp = servoPos_1;
   servoPos_2_temp = servoPos_2;
   servoPos_Base_temp = servoPos_Base;
@@ -110,43 +114,6 @@ void setup() {
 }
 
 void loop() {
-
-  //    while (Serial3.available()){
-  //       delay(10);
-  //       char c = Serial3.read();
-  //       state += c;
-  //     }
-
-  // if (state.length() > 0) 
-  // {
-  //   Serial.println(state);
-
-  //   // Check if the word "bottle" is present in the received string
-  //   if (state.indexOf("bottle") != -1) {
-  //     Serial.println("bottle");
-  //     // Execute your code here if "bottle" is found
-  //   }
-    
-  //   else if (state.indexOf("watch") != -1) {
-  //     Serial.println("watch");
-  //     // Execute your code here if "watch" is found
-  //   } 
-
-  //   else if (state.indexOf("medicine") != -1) {
-  //     Serial.println("medicine");
-  //     // Execute your code here if "medicine" is found
-  //   } 
-
-  //   else if (state.indexOf("lipstick") != -1) {
-  //     Serial.println("lipstick");
-  //     // Execute your code here if "lipstick" is found
-  //   } 
-
-  //    //else { }
-  
-
-  //   state = "";
-  // }
 
 
   while (Serial.available()) {
@@ -197,6 +164,14 @@ void loop() {
       }
       else if(paramName == "my_err"){
         ;
+      }
+      else if(paramName == "bluetooth"){
+        bluetooth = intValue;
+        bluetooth();
+      }
+       else if(paramName == "buzzer"){
+        buzzer = intValue;
+        buzzer();
       }
       else if(paramName == "servo_relax"){
         servoRelax = intValue;
@@ -369,7 +344,55 @@ void X_errFunction(int error){
       Serial.println(response);
       response = "";
 }
+void buzzer(){
+  if(buzzer == 0) {
+    digitalWrite(buzzerLed, LOW)
+  }
+  if(buzzer == 1) {
+    digitalWrite(buzzerLed, HIGH)
+  }
+}
+void bluetooth(){
+      while (Serial3.available()){
+        if(bluetooth == 0){
+          break;
+        }
+        delay(10);
+        char c = Serial3.read();
+        state += c;
+      }
 
+  if (state.length() > 0) 
+  {
+    Serial.println(state);
+
+    // Check if the word "bottle" is present in the received string
+    if (state.indexOf("bottle") != -1) {
+      responce = "bluetooth : bottle"
+            // Execute your code here if "bottle" is found
+    }
+    
+    else if (state.indexOf("watch") != -1) {
+      responce = "bluetooth : watch"
+      // Execute your code here if "watch" is found
+    } 
+
+    else if (state.indexOf("medicine") != -1) {
+      responce = "bluetooth : medicine"
+      // Execute your code here if "medicine" is found
+    } 
+
+    else if (state.indexOf("lipstick") != -1) {
+      responce = "bluetooth : lipstick"
+      // Execute your code here if "lipstick" is found
+    } 
+
+    state = "";
+  }
+
+      Serial.println(response);
+      response = "";
+}
 void motorControl(char pos, char dir, int speed){
   speed = constrain(speed, 0, 255);
   response += "  | " + String(pos) + " " + String(dir) + " : " + String(speed);
