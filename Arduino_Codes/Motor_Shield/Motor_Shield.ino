@@ -19,6 +19,8 @@ String state;
 
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, 200);
 
+#define buzzerLed 13 // YELLOW
+
 #define C1 18 // YELLOW
 #define C2 16 // GREEN
 #define enA 11 //PWN1
@@ -50,6 +52,7 @@ int initSpeed = 0;
 int stopVal = 0;
 int bluetooth = 0;
 int servoRelax = 0;
+int  buzzer = 0;
 
 void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
   analogWrite(pwm,pwmVal);
@@ -70,7 +73,7 @@ void setMotorPos(int dir, int pwmVal, int pwm, int in1, int in2){
 void setup() {
   Serial3.begin(9600); // Bluetooth serial communication will happen on pins 2 and 3
   Serial.begin(115200); // Serial communication to check the data on the Serial Monitor
-  pinMode(13, OUTPUT); // LED connected to pin 13
+  pinMode(buzzerLed, OUTPUT); // LED connected to pin 13
 
   pinMode(C1,INPUT);
   pinMode(C2,INPUT);
@@ -92,7 +95,7 @@ void setup() {
   servoPos_2 = 0;
   servoPos_grip = 0;
   servoPos_cam = 0;
-  
+   
   servoPos_1_temp = servoPos_1;
   servoPos_2_temp = servoPos_2;
   servoPos_Base_temp = servoPos_Base;
@@ -165,6 +168,10 @@ void loop() {
       else if(paramName == "bluetooth"){
         bluetooth = intValue;
         bluetooth();
+      }
+       else if(paramName == "buzzer"){
+        buzzer = intValue;
+        buzzer();
       }
       else if(paramName == "servo_relax"){
         servoRelax = intValue;
@@ -336,6 +343,14 @@ void X_errFunction(int error){
       }
       Serial.println(response);
       response = "";
+}
+void buzzer(){
+  if(buzzer == 0) {
+    digitalWrite(buzzerLed, LOW)
+  }
+  if(buzzer == 1) {
+    digitalWrite(buzzerLed, HIGH)
+  }
 }
 void bluetooth(){
       while (Serial3.available()){
