@@ -1,9 +1,8 @@
 import math
 import sys
-import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSlider, QLabel, QHBoxLayout
-from PyQt5.QtCore import QRect, Qt, QTimer
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import QRect, Qt, QTimer, QThread, pyqtSignal
+from PyQt5.QtGui import QImage, QPixmap, QKeyEvent
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import serial
@@ -11,17 +10,42 @@ import numpy as np
 import cv2
 from torch import cuda
 from ultralytics import YOLO
+import tensorflow as tf
 import random
 from time import time,sleep
 from deep_sort_realtime.deepsort_tracker import DeepSort
-import threading
 
 arm1_length = 23.75
 arm2_length = 21.5
 distance_arm_cam = 29
 object_distance = 20
+targetDoneCount = 0
 
-stop_threads = False
+getGripPos = False
+gripObject = False
+ObjectAvailable = False
+UpdatePlot = True
+reachObject = False
+SearchObject = False
+
+vehicle_angle = 0
+
+servo_cam, servo_base, servo_grip, servo_1, servo_2 = 138,90,0,120,0
+
+gripperLoc_x, gripperLoc_y = 25,10
+
+
+Slope1 = 4.498256643245813
+Intercept1 = 2.6
+
+Slope2 = 4.460188933873144
+Intercept2 = -4.5
+
+def angle_to_motor1(angle):
+    return int(Slope1*angle + Intercept1)
+
+def angle_to_motor2(angle):
+    return int(Slope2*angle + Intercept2)
 
 def calculate_arm_angles(x, y):
     r = math.sqrt(x**2 + y**2)
@@ -31,58 +55,141 @@ def calculate_arm_angles(x, y):
     return int(math.degrees(x1)),int(math.degrees(y1))
 
 def calculate_baseAngle(angle_cam, object_distance):
-    grip_distance = math.sqrt( object_distance**2 + distance_arm_cam**2 - 2*distance_arm_cam*object_distance*math.cos(math.radians(angle_cam+50)) )
-    grip_angle = math.degrees( math.asin( object_distance*math.sin(math.radians(angle_cam+50)) / grip_distance ) )
-    return int(grip_distance), int(grip_angle)
+    grip_distance = math.sqrt( object_distance**2 + distance_arm_cam**2 - 2*distance_arm_cam*object_distance*math.cos(math.radians(angle_cam+42)) )
+    grip_angle = math.degrees( math.asin( object_distance*math.sin(math.radians(angle_cam+42)) / grip_distance ) )
+    return int(grip_distance)+2, 90-int(grip_angle)-3
 
 
-try: ser = serial.Serial('COM10', 115200)  # Replace '/dev/ttyUSB0' with the appropriate port
+try: ser = serial.Serial('/dev/ttyACM0', 115200)  # Replace '/dev/ttyACM0'
 except: print("No Serial")
 
-# time.sleep(1)
-
-servo_cam, servo_base, servo_grip, servo_1, servo_2 = 30,90,0,120,0
-
-gripperLoc_x, gripperLoc_y = 25,10
+sleep(1)
 
 
+interpreter = tf.lite.Interpreter("Image_Processing/TF_Lite/NEW/lite-model_ssd_spaghettinet_edgetpu_large_320_uint8_nms_1.tflite")
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+boxes = []
+classes = []
+scores = []
+
+
+class WorkerThread(QThread):
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+
+    def run(self):
+        global boxes, classes, scores, output_details, input_details, interpreter
+        while True:
+        #     if not getGripPos:
+        #         self.parent.getGripPos()
+        #         continue
+            
+        #     if not gripObject:
+        #         self.parent.gripObject()
+        #         break
+            try:
+                ret, frame = self.parent.video_stream.read()
+                if ret:
+                    start_time = time()
+
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    input_shape = input_details[0]['shape']
+                    frame_resized = cv2.resize(frame_rgb, (input_shape[2], input_shape[1]))
+                    input_data = np.expand_dims(frame_resized, axis=0)
+
+                    interpreter.set_tensor(input_details[0]['index'],input_data)
+                    interpreter.invoke()
+
+                    boxes = interpreter.get_tensor(output_details[0]['index'])[0] # Bounding box coordinates of detected objects
+                    classes = interpreter.get_tensor(output_details[1]['index'])[0] # Class index of detected objects
+                    scores = interpreter.get_tensor(output_details[2]['index'])[0] # Confidence of detected objects
+
+                    for i in range(len(scores)):
+                        # continue
+                        class_id = int(classes[i])
+                        if (int(class_id)==43 and scores[i] > 0.5):
+                            # int(class_id)==0 and
+                            ymin = int(max(1,(boxes[i][0] * 360)))
+                            xmin = int(max(1,(boxes[i][1] * 640)))
+                            ymax = int(min(360,(boxes[i][2] * 360)))
+                            xmax = int(min(640,(boxes[i][3] * 640)))
+
+                            color = self.parent.colors[class_id % len(self.parent.colors)]
+                            # cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (color), 3)
+                            # cv2.putText(frame,f'ID : {class_id}',(xmin,ymin),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+
+                            left, top, right, bottom = xmin, ymin, xmax, ymax
+                            # detections.append([[xmin, ymin, xmax, ymax], scores[i], int(classes[i])])
+
+                            obj_mid = [int((left+right)/2),int((top+bottom)/2)]
+
+                            frame_width_mid = int(self.parent.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
+                            frame_height_mid = int(self.parent.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
+
+                            errorX = (obj_mid[0] - frame_width_mid)
+                            errorY = (frame_height_mid - obj_mid[1])
+                                            
+                            # print("Change X : ", errorX, " | Change Y : ", errorY)
+                            cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
+                            cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
+                            cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
+
+                            cv2.rectangle(frame, (left, top), (right, bottom), (color), 3)
+                            # cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
+                            cv2.putText(frame,f'ID : {class_id}',(left,top),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+
+                    end_time = time()
+                    fps = round(1/(end_time - start_time), 2)
+                    cv2.putText(frame,f'FPS : {fps}',(50,50),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,255),1)
+
+                    rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    h, w, ch = rgb_image.shape
+                    bytes_per_line = ch * w
+                    q_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                    pixmap = QPixmap.fromImage(q_image)
+                    scaled_pixmap = pixmap.scaled(640, 360, Qt.KeepAspectRatio) # type: ignore
+                    self.parent.image_label.setPixmap(scaled_pixmap)
+
+            except: pass
+        print("finished")
+
+        self.finished.emit()
 
 
 class MainWindow(QMainWindow):
-    kp = [0.02, 0.02]  # Proportional gain
-    ki = [0.0, 0.0]  # Integral gain
-    kd = [0.0, 0.0]  # Derivative gain
+    kp_cam = [0.01, 1]  # Proportional gain
+    kp_vehicle = [0.041, 1]  # Proportional gain
 
-    last_time = 0  # Last time update occurred
-    error_sum_x = 0.0  # Cumulative error
-    last_error_x = 0.0  # Last error
-    error_sum_y = 0.0  # Cumulative error
-    last_error_y = 0.0  # Last error
 
     def __init__(self):
         super().__init__()
         global gripperLoc_x, gripperLoc_y, servo_cam, servo_base, servo_grip, servo_1, servo_2
 
-        self.device = 'cuda' if cuda.is_available() else 'cpu'
-        print("Using Device: ", self.device)
-        self.model = YOLO("yolov8n.pt")
-        self.model.fuse()
-        self.tracker = DeepSort(max_age=5)
+        # self.device = 'cuda' if cuda.is_available() else 'cpu'
+        # print("Using Device: ", self.device)
+        # self.model = YOLO("yolov8n.pt")
+        # self.model.fuse()
+        # self.tracker = DeepSort(max_age=5)
+        # self.CLASS_NAMES_DICT = self.model.names
+
         self.colors = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for j in range(10)]
-        self.CLASS_NAMES_DICT = self.model.names
+
         self.SendData(f"servo_cam:{servo_cam}, #:#\n")
 
-        self.resize(1200, 600)
+        self.resize(1300, 800)
 
         self.image_label = QLabel(self)
-        self.video_stream = cv2.VideoCapture(1)
+        self.video_stream = cv2.VideoCapture(0)
+        self.video_stream.set(3,640)
+        self.video_stream.set(4,360)
         assert self.video_stream.isOpened()
-
-        # self.timer = QTimer()
-        # self.timer.timeout.connect(self.update_frame) # type: ignore
-        # self.timer.start(30)  # Update the frame every 30ms (30 FPS)
-        
-        threading.Thread(target = self.flow).start()
+        print("running")
 
         self.centralwidget = QWidget()
 
@@ -169,43 +276,143 @@ class MainWindow(QMainWindow):
         self.slider4.valueChanged.connect(self.sliderChanged)
         self.slider5.valueChanged.connect(self.sliderChanged)
 
+        self.thread = WorkerThread(parent=self)
+        # self.thread.finished.connect(self.task_completed)
+        self.thread.start()
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.flow) # type: ignore
+        self.timer.start(1)  # (30 FPS)
+
 
     def flow(self):
-        global servo_cam, object_distance, servo_1, servo_2, servo_base
+        global gripObject, SearchObject
 
-        thread = threading.Thread(target = self.getGripPos)
-        thread.start()
-        thread.join()
+        if not SearchObject:
+            self.SearchObject()
+            return
         
-        try:
-            grip_distance, servo_base = calculate_baseAngle(servo_cam, object_distance)
-            for angle in range(90, servo_base, -1):
-                self.SendData(f"servo_base:{angle}, #:#\n")
-                sleep(0.05)
+        if not gripObject:
+            self.gripObject()
+            return
+        
+        print(">>>>>>>>>>>> ALL DONE <<<<<<<<<<<<<<")
+        
+    def SearchObject(self):
+        global ObjectAvailable
+        if not ObjectAvailable:
+            self.SendData(f"m1_pos:6,m2_pos:-6, #:#\n")
+            sleep(0.2)
+            self.ObjectAvailable()
+        else:
+            self.reachObject()
 
-            for distance in range(5, grip_distance):
-                servo_1, servo_2 = calculate_arm_angles(distance, 5)
-                self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
-                sleep(0.05)
 
-            self.SendData(f"servo_grip:20, #:#\n")
+    def gotoObjectLeft(self):
+        global SearchObject, servo_cam, targetDoneCount
+        arr = [[80 ,0, 3], [10, 10, 1.5], [0, 80, 3], [20, 20, 1.5]]
+        for item in arr:
+            if item[0]==0 and item[1]!=0:
+                if item[1] > 0:
+                    m2 = angle_to_motor2(item[1])
+                    for _ in range(m2):
+                        self.SendData(f"m2_pos:-1, #:#\n")
+                else:
+                    m2 = angle_to_motor2(-item[1])
+                    for _ in range(m2):
+                        self.SendData(f"m2_pos:1, #:#\n")
+            elif item[1]==0 and item[0]!=0:
+                if item[0] > 0:
+                    m1 = angle_to_motor1(item[0])
+                    for _ in range(m1):
+                        self.SendData(f"m1_pos:-1, #:#\n")
+                else:
+                    m1 = angle_to_motor1(-item[0])
+                    for _ in range(m1):
+                        self.SendData(f"m1_pos:1, #:#\n")
+            else:
+                if item[0] > 0:
+                    m1 = angle_to_motor1(item[0])
+                    for _ in range(m1):
+                        self.SendData(f"m1_pos:-1,m2_pos:-1, #:#\n")
+                else:
+                    m1 = angle_to_motor1(-item[0])
+                    for _ in range(m1):
+                        self.SendData(f"m1_pos:1,m2_pos:1, #:#\n")
             sleep(0.5)
-
-            for distance in range(grip_distance, 5, -1):
-                servo_1, servo_2 = calculate_arm_angles(distance, 5)
-                servo_2 = 180 - servo_1
-                self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
-                sleep(0.05)
-
-            for angle in range(servo_base, 90):
-                self.SendData(f"servo_base:{angle}, #:#\n")
-                sleep(0.05)
-
-        except:
-            print("Math err")
+            
+        SearchObject = True
+        servo_cam = 30
+        targetDoneCount = 0
+        self.SendData(f"servo_cam:{servo_cam}, #:#\n")
+        print("gripping.............")
 
 
-    def SendData(self, dataStr):
+    def reachObject(self):
+        global boxes, classes, scores
+        global object_distance, servo_cam, reachObject, targetDoneCount
+    
+        # print(scores)
+        # print(classes)
+
+        if 43 not in map(int, classes):
+            targetDoneCount = 0
+
+        for i in range(len(scores)):
+            class_id = int(classes[i])
+            if (int(class_id)==43 and scores[i] > 0.6):
+                ymin = int(max(1,(boxes[i][0] * 360)))
+                xmin = int(max(1,(boxes[i][1] * 640)))
+                ymax = int(min(360,(boxes[i][2] * 360)))
+                xmax = int(min(640,(boxes[i][3] * 640)))
+
+                left, top, right, bottom = xmin, ymin, xmax, ymax
+
+                obj_mid = [int((left+right)/2),int((top+bottom)/2)]
+
+                frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
+                frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
+
+                errorX = (obj_mid[0] - frame_width_mid)
+                errorY = (frame_height_mid - obj_mid[1])
+
+                print("Final ERR : ", errorX)
+
+                if (-30 < errorX < 30):
+                    targetDoneCount +=1
+                else:
+                    targetDoneCount = 0
+
+                finalErr_x = self.kp_vehicle[0] * errorX
+                finalErr_y = self.kp_vehicle[1] * errorY
+
+                intErr = round(finalErr_x)
+
+                if intErr > 0:
+                    self.SendData(f"m2_pos:{-intErr}, #:#\n", 0)
+                else:
+                    self.SendData(f"m1_pos:{intErr}, #:#\n", 0)
+
+        if( targetDoneCount > 10 ):
+            Distance = []
+            for i in range(11):
+                response = self.SendData(f"distance:0, #:#\n", 0)
+                if response['Distance']:
+                    Distance.append(int(response['Distance']))
+                    if i%2==0:
+                        self.SendData(f"m1_pos:-5,m2_pos:-5, #:#\n", 0)
+                sleep(0.02)
+            object_distance = int(np.percentile(Distance, 50))
+            if object_distance < 25:
+                self.gotoObjectLeft()
+            print("Object_distance : ", object_distance)
+
+            reachObject = True
+        else:
+            sleep(0.1)
+                        
+
+    def SendData(self, dataStr, show=1):
         try:
             ser.write(dataStr.encode())
 
@@ -215,7 +422,8 @@ class MainWindow(QMainWindow):
                     string = ser.readline().decode().rstrip()
                     break
             
-            # print(string)
+            if show==1: print(string)
+
             segments = string.split(",")
 
             key_value_pairs = {}
@@ -231,15 +439,76 @@ class MainWindow(QMainWindow):
             print("Err<< :", dataStr)
 
 
+    def gripObject(self):
+        global gripObject, getGripPos, servo_cam, object_distance, UpdatePlot, ObjectAvailable
+        try:
+            UpdatePlot = False
+            
+            if ObjectAvailable:
+                self.getGripPos()
+                if not getGripPos: return
+
+                grip_distance, servo_base_tmp = calculate_baseAngle(servo_cam, object_distance)
+                print(">>>>>>>>>>>>>>>>",grip_distance, servo_base_tmp,">>>>>>>>>>>>>>>>>>")
+                # self.slider2.setValue(servo_base)
+                # self.slider4.setValue(grip_distance)
+                # return
+
+                self.slider2.setValue(servo_base_tmp)
+
+                sleep(1)
+                servo_grip = 0
+                self.slider3.setValue(servo_grip)
+
+                sleep(1)
+                
+                for distance in range(10, grip_distance+1):
+                    self.slider4.setValue(distance)
+                    self.slider5.setValue(int(5-(distance-10)/3))
+                    sleep(0.06)
+
+                sleep(1)
+                servo_grip = 50
+                self.slider3.setValue(servo_grip)
+                sleep(2.5)
+
+                for distance in range(grip_distance, 10, -1):
+                    self.slider4.setValue(distance)
+                    self.slider5.setValue(int(5-(distance-10)/3))
+                    sleep(0.06)
+
+                sleep(1)
+
+                getGripPos = False
+                self.ObjectAvailable()
+
+            else:
+                print("got<<<<<<<<<<<<<<<<<<")
+                for angle in range(servo_base, 91):
+                    self.slider2.setValue(angle)
+                    sleep(0.04)
+
+                sleep(1)
+                servo_grip = 0
+                self.slider3.setValue(servo_grip)
+
+                gripObject = True
+                UpdatePlot = True
+
+                print("<<<<<<<<<< done >>>>>>>>>>>>")
+        except:
+            print("Math err")
+
+
     def update_plot(self):
-        lx1 = arm1_length * math.cos(math.radians(servo_1)) * math.cos(math.radians(servo_base-100))
+        lx1 = arm1_length * math.cos(math.radians(servo_1)) * math.cos(math.radians(servo_base-90))
         lz1 = arm1_length * math.sin(math.radians(servo_1))
-        ly1 = arm1_length * math.cos(math.radians(servo_1)) * math.sin(math.radians(servo_base-100))
+        ly1 = arm1_length * math.cos(math.radians(servo_1)) * math.sin(math.radians(servo_base-90))
 
         realY = math.radians(servo_1) + math.radians(servo_2) - math.pi
-        lx2 = arm2_length * math.cos(realY) * math.cos(math.radians(servo_base-100))
+        lx2 = arm2_length * math.cos(realY) * math.cos(math.radians(servo_base-90))
         lz2 = arm2_length * math.sin(realY)
-        ly2 = arm2_length * math.cos(realY) * math.sin(math.radians(servo_base-100))
+        ly2 = arm2_length * math.cos(realY) * math.sin(math.radians(servo_base-90))
 
         self.ax.clear()
 
@@ -279,8 +548,8 @@ class MainWindow(QMainWindow):
         lx1 = grip_distance*math.cos(math.radians(grip_angle))
         ly1 = grip_distance*math.sin(math.radians(grip_angle))
 
-        lx2 = distance_arm_cam - object_distance*math.cos(math.radians(servo_cam+50))
-        ly2 = object_distance*math.sin(math.radians(servo_cam+50))
+        lx2 = distance_arm_cam - object_distance*math.cos(math.radians(servo_cam+42))
+        ly2 = object_distance*math.sin(math.radians(servo_cam+42))
 
         x = np.array([distance_arm_cam, lx2, 0])
         y = np.array([0, -ly2, 0])
@@ -294,17 +563,18 @@ class MainWindow(QMainWindow):
         self.ax.set_xlabel('X')
         self.ax.set_ylabel('Y')
         self.ax.set_zlabel('Z')
-        # self.ax.set_title('3D Beam Visualization')
+        self.ax.set_title('Robot Arm')
 
         self.ax.set_xlim3d(-15, 35)
-        self.ax.set_ylim3d(-25, 15)
-        self.ax.set_zlim3d(0, 20)
+        self.ax.set_ylim3d(-25, 25)
+        self.ax.set_zlim3d(0, 50)
 
         self.canvas.draw()
 
+
     def sliderChanged(self):
-        global servo_cam,servo_base,servo_grip,servo_1,servo_2
-        global gripperLoc_x, gripperLoc_y
+        global servo_cam, servo_base, servo_grip, servo_1, servo_2
+        global gripperLoc_x, gripperLoc_y, UpdatePlot
         
         slider1_value = self.slider1.value()
         slider2_value = self.slider2.value()
@@ -312,145 +582,150 @@ class MainWindow(QMainWindow):
         slider4_value = self.slider4.value()
         slider5_value = self.slider5.value()
 
-        command = ""
-
         if slider1_value != servo_cam:
-            command = f"servo_cam:{slider1_value}, #:#\n"
+            self.SendData(f"servo_cam:{slider1_value}, #:#\n")
             servo_cam = slider1_value
         if slider2_value != servo_base:
-            print(slider2_value)
-            command = f"servo_base:{slider2_value}, #:#\n"
+            self.SendData(f"servo_base:{slider2_value}, #:#\n")
             servo_base = slider2_value
         if slider3_value != servo_grip:
-            command = f"servo_grip:{slider3_value}, #:#\n"
+            self.SendData(f"servo_grip:{slider3_value}, #:#\n")
             servo_grip = slider3_value
-        # if slider3_value != servo_grip:
-        #     if servo_grip<slider3_value:
-        #         x_val, y_val = calculate_arm_angles(slider3_value/2)
-        #     else:
-        #         x_val, y_val = calculate_arm_angles(slider3_value/2)
-        #         y_val = 180 - x_val
-        #     # servo_grip = slider3_value
-        #     command = f"servo_1:{x_val},servo_2:{y_val}, {slider3_value}#:#\n"
-        #     servo_grip = slider3_value
-        #     # print(command)
         if slider4_value != gripperLoc_x or slider5_value != gripperLoc_y:
-            gripperLoc_x = slider4_value
-            gripperLoc_y = slider5_value
             print(gripperLoc_x, gripperLoc_y)
-
             try:
-                servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
-                command = f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n"
+                if gripperLoc_x > slider4_value:
+                    servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
+                    servo_2 = 180 - servo_1
+                else:
+                    servo_1, servo_2 = calculate_arm_angles(gripperLoc_x, gripperLoc_y)
+                self.SendData(f"servo_1:{servo_1},servo_2:{servo_2}, #:#\n")
             except:
                 print("Math err")
+            gripperLoc_x = slider4_value
+            gripperLoc_y = slider5_value
 
-        # print(command)
-        if command != "" and 'ser' in globals():
-            ser.write(command.encode())
-            while True:
-                if ser.in_waiting > 0:
-                    data = ser.readline().decode().rstrip()
-                    print(data)
-                    break
-        self.update_plot()
+        # if UpdatePlot: self.update_plot()
+
+
+    def ObjectAvailable(self):
+        global ObjectAvailable, classes, scores
+
+        available = []
+        for _ in range(20):
+            for i in range(len(classes)):
+                class_id = int(classes[i])
+                if class_id==43 and scores[i] > 0.5:
+                    available.append(True)
+
+            available.append(False)
+
+        ObjectAvailable = max(available, key=available.count)
+        # print(available)
+
 
     def getGripPos(self):
-        global object_distance, servo_cam, stop_threads
-        targetDone = 0
-        while not stop_threads:
-            ret, frame = self.video_stream.read()
-            if ret:
-                start_time = time()
-                # frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-                results = self.model.predict(frame, verbose=False)[0]
+        global targetDoneCount, getGripPos, object_distance, servo_cam
+        global boxes, classes, scores
 
-                detections = []
-                for r in results.boxes.data.tolist():
-                    x1, y1, x2, y2, score, class_id = r
-                    if(class_id == 0):
-                        x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
-                        detections.append([[x1, y1, x2, y2], score, class_id])
+        # print(scores)
+        # print(classes)
 
-                tracked = self.tracker.update_tracks(detections, frame=frame)
+        for i in range(len(scores)):
+            class_id = int(classes[i])
+            if (int(class_id)==43 and scores[i] > 0.6):
+                ymin = int(max(1,(boxes[i][0] * 360)))
+                xmin = int(max(1,(boxes[i][1] * 640)))
+                ymax = int(min(360,(boxes[i][2] * 360)))
+                xmax = int(min(640,(boxes[i][3] * 640)))
+
+                left, top, right, bottom = xmin, ymin, xmax, ymax
+        #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+        # results = self.model.predict(frame, verbose=False)[0]
+
+        # detections = []
+        # for r in results.boxes.data.tolist():
+        #     x1, y1, x2, y2, score, class_id = r
+        #     # if(class_id == 1):
+        #     x1, y1, x2, y2 = map(int, [x1, y1, x2, y2])
+        #     detections.append([[x1, y1, x2, y2], score, class_id])
+        #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0,0,255), 3)
+
+        # tracked = self.tracker.update_tracks(detections, frame=frame)
+        
+        # for track in tracked:   
+        #         if not track.is_confirmed():
+        #             continue
+        #         class_id = int(track.track_id)
+        #         color = self.colors[class_id % len(self.colors)]
                 
-                for track in tracked:   
-                    if not track.is_confirmed():
-                        continue
-                    track_id = int(track.track_id)
-                    color = self.colors[track_id % len(self.colors)]
-                    
-                    x1, y1, x2, y2 = map(int, track.to_ltwh(orig=True))
-                    obj_mid = [int((x1+x2)/2),int((y1+y2)/2)]
+        #         left, top, right, bottom = map(int, track.to_ltwh(orig=True))
 
-                    frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
-                    frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
+        # #  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-                    errorX = (obj_mid[0] - frame_width_mid)
-                    errorY = (frame_height_mid - obj_mid[1])
-                                    
-                    # print("Change X : ", errorX, " | Change Y : ", errorY)
-                    cv2.line(frame, (frame_width_mid, frame_height_mid), (obj_mid[0], frame_height_mid), color, 2)
-                    cv2.line(frame, (frame_width_mid, frame_height_mid), (frame_width_mid, obj_mid[1]), color, 2)
-                    cv2.putText(frame,f'X:{errorX} | Y:{errorY}',(obj_mid[0],obj_mid[1]),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,255),1)
+                obj_mid = [int((left+right)/2),int((top+bottom)/2)]
 
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (color), 3)
-                    # cv2.circle(frame,(obj_mid[0],obj_mid[1]),4,(255,0,0),-1)
-                    cv2.putText(frame,f'ID : {track_id}',(x1,y1),cv2.FONT_HERSHEY_COMPLEX,0.5,(255,0,0),1)
+                frame_width_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH)/2)
+                frame_height_mid = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT)/2)
 
-                    current_time = time()
-                    self.elapsed_time = current_time - self.last_time
+                errorX = (obj_mid[0] - frame_width_mid)
+                errorY = (frame_height_mid - obj_mid[1])
 
-                    self.error_sum_x += errorX * self.elapsed_time
-                    d_error_x = (errorX - self.last_error_x) / self.elapsed_time
+                finalErr_x = self.kp_cam[0] * errorX
+                finalErr_y = self.kp_cam[1] * errorY
 
-                    self.error_sum_y += errorY * self.elapsed_time
-                    d_error_y = (errorY - self.last_error_y) / self.elapsed_time
+                servo_cam_ = servo_cam - round(finalErr_x)
+                if servo_cam_ < 0: servo_cam_ = 0
+                if servo_cam_ > 180: servo_cam_ = 180
+                
+                self.slider1.setValue(servo_cam_)
 
-                    finalErr_x = self.kp[0] * errorX + self.ki[0] * self.error_sum_x + self.kd[0] * d_error_x
-                    finalErr_y = self.kp[1] * errorY + self.ki[1] * self.error_sum_y + self.kd[1] * d_error_y
+                if (-0.4 < finalErr_x < -0.2 or 0.2 < finalErr_x < 0.4):
+                    self.SendData(f"m1_pos:1, #:#\n")
+                    print(finalErr_x)
+                    sleep(0.05)
 
-                    servo_cam -= round(finalErr_x)
-                    if servo_cam < 0: servo_cam = 0
-                    if servo_cam > 180: servo_cam = 180
-                    
-                    response = self.SendData(f"servo_cam:{servo_cam},distance:0, #:#\n")
-                    if type(response) == 'dict':
-                        object_distance = response['Distance']
+                if (-0.2 < finalErr_x < 0.2):
+                    targetDoneCount +=1
 
-                    self.slider1.setValue(servo_cam)
-                    
-                    if (-0.3 < finalErr_x < 0.3):
-                        targetDone +=1
+                if( targetDoneCount > 10 ):
+                    while True:
+                        Distance = []
+                        for _ in range(15):
+                            response = self.SendData(f"distance:0, #:#\n", 0)
+                            if response['Distance']:
+                                Distance.append(int(response['Distance']))
+                            sleep(0.02)
+                        object_distance = int(np.percentile(Distance, 50))
+                        print(object_distance)
+                        if object_distance > 35:
+                            self.SendData(f"m1_pos:1, #:#\n")
+                        else:
+                            break
 
-                    if( targetDone > 3 ):
-                        print(finalErr_x)
-                        return finalErr_x
+                    print(">>>>>>>>>>> object_distance : ", object_distance)
 
-                    self.last_error_x = errorX
-                    self.last_error_y = errorY
-                    self.last_time = current_time
+                    getGripPos = True
 
-                rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = rgb_image.shape
-                bytes_per_line = ch * w
-                q_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(q_image)
-                scaled_pixmap = pixmap.scaled(640, 480, Qt.KeepAspectRatio) # type: ignore
-                self.image_label.setPixmap(scaled_pixmap)
-                # self.update_plot()
 
-                end_time = time()
-                fps = round(1/(end_time - start_time), 2)
-                print(f'FPS: {fps}')
+    def keyPressEvent(self, event: QKeyEvent):
+        key = event.key()
+
+        if key == Qt.Key_W:
+            self.SendData(f"m1_pos:-3,m2_pos:-3, #:#\n")
+        elif key == Qt.Key_S:
+            self.SendData(f"m1_pos:3,m2_pos:3, #:#\n")
+        elif key == Qt.Key_A:
+            self.SendData(f"m1_pos:-3,m2_pos:3, #:#\n")
+        elif key == Qt.Key_D:
+            self.SendData(f"m1_pos:3,m2_pos:-3, #:#\n")
 
 
     def closeEvent(self, event):
-        global stop_threads
         self.video_stream.release()
         self.SendData("m_stop:1, #:#\n")
         event.accept()
-        stop_threads = False
         try: ser.close()
         except: pass
 
@@ -458,5 +733,4 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     mainWindow = MainWindow()
-    mainWindow.show()
     sys.exit(app.exec_())
